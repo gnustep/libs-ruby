@@ -3,3 +3,17 @@ Version 0.1.0
 
 Initial package put together to work with gnustep-base-1.0.0 and gnustep-gui-0.6.x and above
 
+
+Version 0.2.0
+=============
+
+Major revision with plenty of new features:
+- C structure handling from and to GNUstep as Ruby arrays
+- all (?) constants and enums of NSxxx classes now available in Ruby
+- NSRange, NSRect, NSSize and NSPoint methods added to Array class
+- More testing code
+- require 'Foundation' and require 'AppKit' now loads all classes at once
+- NSNumber automatically morphed to Ruby numbers if asked 
+- Cleaner and more robust code
+
+See ChangeLog for more details
