@@ -84,6 +84,7 @@ int _RIGS_ruby_method_arity(const char *rb_class_name, const char *rb_mth_name)
 
 Class _RIGS_register_ruby_class (VALUE rb_class)
 {
+  CREATE_AUTORELEASE_POOL(pool);
   MethodList *ml;
   int i;
   int count;
@@ -97,9 +98,9 @@ Class _RIGS_register_ruby_class (VALUE rb_class)
   char objcTypes[128];
   char *rb_class_name = NULL;
   NSString *className;
-  id pool = [NSAutoreleasePool new];
   BOOL guessed;
   IMP mthIMP;
+
 
 
   // If this class has already been registered then
@@ -262,7 +263,7 @@ Class _RIGS_register_ruby_class (VALUE rb_class)
   }
   
 
-  [pool release];
+  DESTROY(pool);
 
   return class;
   

@@ -98,9 +98,9 @@ static NSMutableDictionary *_rodict = NULL;
 
 - (id) initWithRubyObject: (VALUE)rubyObject
 {
-  /* do we need to retain the object here? 
-     how to known when the wrapped ruby object has been disposed of
-     and delete the RIGSWrapObject accordingly?? */
+  /* FIXME:  how do we known when the wrapped ruby object has
+     been disposed of on the Ruby side and we must delete the 
+     corresponding RIGSWrapObject ?? */
   self = [self init];
   _ro = rubyObject;
   [_rodict setObject: self
@@ -118,7 +118,7 @@ static NSMutableDictionary *_rodict = NULL;
 */
 - (void) forwardInvocation: (NSInvocation *)anInvocation
 {
-    id pool = [NSAutoreleasePool new];
+    CREATE_AUTORELEASE_POOL(pool);
     int nbArgs;
     int mthReturnLength;
     unsigned int i;
@@ -190,7 +190,7 @@ static NSMutableDictionary *_rodict = NULL;
       [anInvocation setReturnValue:data];
     }
     
-    [pool release];
+    DESTROY(pool);
     
 }
 

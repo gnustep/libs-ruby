@@ -134,20 +134,20 @@ rb_funcall(aCStruct, rb_intern("push"), 1, aValue)
 void
 rb_objc_release(id objc_object) 
 {
-    NSDebugLog(@"Call to ObjC release on 0x%lx",objc_object);
+  NSDebugLog(@"Call to ObjC release on 0x%lx",objc_object);
 
-    if (objc_object != nil) {
-        CREATE_AUTORELEASE_POOL(pool);
-        /* Use an autorelease pool here because both `repondsTo:' and
-                 `release' could autorelease objects. */
+  if (objc_object != nil) {
+    CREATE_AUTORELEASE_POOL(pool);
+    /* Use an autorelease pool here because both `repondsTo:' and
+       `release' could autorelease objects. */
 
-        NSMapRemove(knownObjects, (void*)objc_object);
-      if ([objc_object respondsToSelector: @selector(release)])
-	{
-	  [objc_object release];
-	}
-      DESTROY(pool);
-    }
+    NSMapRemove(knownObjects, (void*)objc_object);
+    if ([objc_object respondsToSelector: @selector(release)])
+      {
+        [objc_object release];
+      }
+    DESTROY(pool);
+  }
  
 }
 
@@ -160,20 +160,23 @@ rb_objc_mark(VALUE rb_object)
 }
 
 
+/* 
+    Normally new method has no arg in objective C. 
+    If you want it to have arguments when using new from Ruby then
+    override the new method from Ruby.  See NSSelector.rb for an example
+*/
 VALUE
 rb_objc_new(int rb_argc, VALUE *rb_argv, VALUE rb_class)
 {
-    id pool = [[NSAutoreleasePool alloc] init];
+    CREATE_AUTORELEASE_POOL(pool);
     id obj;
     VALUE new_rb_object;
    
     // get the class from the objc_class class variable now
     Class objc_class = (Class) NUM2UINT(rb_iv_get(rb_class, "@objc_class"));
-    
-    // Normally new method has no arg in objective C. If you want it to have one
-    // when called fom Ruby then override the new method from the Ruby side
-    // See NSSelector.rb for an example
-    //obj  = [[[objc_class alloc] init] retain];
+
+    // This object is not released on purpose. The Ruby garbage collector
+    // will take care of deallocating it by calling rb_objc_release()
     obj  = [[objc_class alloc] init];
     new_rb_object = Data_Wrap_Struct(rb_class, 0, rb_objc_release, obj);
 
@@ -182,7 +185,7 @@ rb_objc_new(int rb_argc, VALUE *rb_argv, VALUE rb_class)
     NSDebugLog(@"Creating new object of Class %@ (id = 0x%lx, VALUE = 0x%lx)",
                NSStringFromClass([objc_class class]), obj, new_rb_object);
 
-    [pool release];
+    DESTROY(pool);
     return new_rb_object;
 }
 
@@ -256,15 +259,15 @@ rb_objc_convert_to_objc(VALUE rb_thing,void *data, int offset, const char *type)
           
                 case T_STRING:
                     /* Ruby sends a string to a ObjC method waiting for an id
-                       so convert it to NSString automatically */
+                                       so convert it to NSString automatically */
                     *(NSString**)where = [NSString stringWithCString: STR2CSTR(rb_val)];
                     break;
           
                 case T_OBJECT:
                 case T_CLASS:
                     /* Ruby sends a Ruby class or a ruby object. Automatically register
-                       an ObjC proxy class. It is very likely that we'll need it in the future
-                       (e.g. typical for setDelegate method call) */
+                                      an ObjC proxy class. It is very likely that we'll need it in the future
+                                      (e.g. typical for setDelegate method call) */
                     rb_class_val = (TYPE(rb_val) == T_CLASS ? rb_val : CLASS_OF(rb_val));
                     NSDebugLog(@"Converting object of Ruby class: %s", rb_class2name(rb_class_val));
                     objcClass = _RIGS_register_ruby_class(rb_class_val);
@@ -274,8 +277,9 @@ rb_objc_convert_to_objc(VALUE rb_thing,void *data, int offset, const char *type)
           
                 case T_ARRAY:
                 case T_HASH:
-                    /* For hashes and array do not create ObjC proxy for the moment 
-                       FIXME?? Should probably be handled like T_OBJECT and T_CLASS */
+                    /* For hashes and array do not create ObjC proxy for the
+                                       moment
+                                       FIXME?? Should probably be handled like T_OBJECT and T_CLASS */
                     *(id*)where = (id) [RIGSWrapObject objectWithRubyObject: rb_val];
                     NSDebugLog(@"Wrapping Ruby Object of type: 0x%02x (ObjC object at 0x%lx)",TYPE(rb_val), *(id*)where);
                     break;
@@ -602,11 +606,12 @@ rb_objc_convert_to_rb(void *data, int offset, const char *type, VALUE *rb_val_pt
                   
               } else {
                   
-                  // Retain the value otherwise GNUStep releases it and Ruby crashes
-                  // It's Ruby's garbage collector job to indirectly release the ObjC 
-                  // object by calling rb_objc_release() */
+                /* Retain the value otherwise GNUStep releases it and Ruby crashes
+                                It's Ruby garbage collector job to indirectly release the ObjC 
+                                object by calling rb_objc_release()
+                            */
                   if ([val respondsToSelector: @selector(retain)]) {
-                      [val retain];
+                      RETAIN(val);
                   }
                   
                   NSDebugLog(@"Class of arg transmitted to Ruby = %@",NSStringFromClass([val class]));
@@ -735,7 +740,7 @@ rb_objc_convert_to_rb(void *data, int offset, const char *type, VALUE *rb_val_pt
                 if (rb_class == Qfalse) {
                     rb_class = rb_objc_register_class_from_objc([NSSelector class]);
                 }
-                selObj = [[NSSelector selectorWithSEL: (SEL)val] retain];
+                selObj = RETAIN([NSSelector selectorWithSEL: (SEL)val]);
                 rb_val = Data_Wrap_Struct(rb_class,0,rb_objc_release,selObj);
             }
           }
@@ -805,12 +810,12 @@ VALUE
 rb_objc_send(char *method, int rb_argc, VALUE *rb_argv, VALUE rb_self)
 {
     SEL sel;
-    id pool = [[NSAutoreleasePool alloc] init];
+    CREATE_AUTORELEASE_POOL(pool);
 
     NSDebugLog(@"<<<< Invoking method %s with %d argument(s) on Ruby VALUE 0x%lx (Objc id 0x%lx)",method, rb_argc, rb_self);
 
     sel = SelectorFromRubyName(method, rb_argc > 0);
-    [pool release];
+    DESTROY(pool);
 
     return rb_objc_send_with_selector(sel, rb_argc, rb_argv, rb_self);
 }
@@ -819,7 +824,7 @@ rb_objc_send(char *method, int rb_argc, VALUE *rb_argv, VALUE rb_self)
 VALUE
 rb_objc_send_with_selector(SEL sel, int rb_argc, VALUE *rb_argv, VALUE rb_self)
 {
-    id pool = [NSAutoreleasePool new];
+    CREATE_AUTORELEASE_POOL(pool);
     id rcv;
     NSInvocation *invocation;
     NSMethodSignature	*signature;
@@ -930,7 +935,7 @@ rb_objc_send_with_selector(SEL sel, int rb_argc, VALUE *rb_argv, VALUE rb_self)
     NSDebugLog(@">>>>> VALUE returned to Ruby = 0x%lx (class %s)",
                rb_retval, rb_class2name(CLASS_OF(rb_retval)));
         
-    [pool release];	
+    DESTROY(pool);
     return rb_retval;
 }
 
@@ -943,7 +948,7 @@ rb_objc_handler(int rb_argc, VALUE *rb_argv, VALUE rb_self)
 VALUE 
 rb_objc_to_s_handler(VALUE rb_self)
 {
-    id pool = [NSAutoreleasePool new];
+    CREATE_AUTORELEASE_POOL(pool);
     id rcv;
     VALUE rb_desc;
 
@@ -951,7 +956,7 @@ rb_objc_to_s_handler(VALUE rb_self)
     Data_Get_Struct(rb_self,id,rcv);
     rb_desc = rb_str_new2([[rcv description] cString]);
  
-    [pool release];
+    DESTROY(pool);
     return rb_desc;
 
 }
@@ -1096,7 +1101,7 @@ VALUE
 rb_objc_register_class_from_objc (Class objc_class)
 {
 
-    id pool = [[NSAutoreleasePool alloc] init];
+    CREATE_AUTORELEASE_POOL(pool);
     const char *cname = [NSStringFromClass(objc_class) cString];
 
     Class objc_super_class = [objc_class superclass];
@@ -1162,14 +1167,14 @@ rb_objc_register_class_from_objc (Class objc_class)
     // load any additional Ruby code if there is some
     //rb_define_global_const(cname, rb_class);
 
-    [pool release];
+    DESTROY(pool);
     return rb_class;
 }
 
 VALUE
 rb_objc_register_class_from_ruby(VALUE rb_self, VALUE rb_name)
 {
-    id pool = [[NSAutoreleasePool alloc] init];		
+    CREATE_AUTORELEASE_POOL(pool);		
     char *cname = STR2CSTR(rb_name);
     VALUE rb_class = Qnil;
 
@@ -1178,7 +1183,7 @@ rb_objc_register_class_from_ruby(VALUE rb_self, VALUE rb_name)
     if(objc_class)
         rb_class = rb_objc_register_class_from_objc(objc_class);
 
-    [pool release];
+    DESTROY(pool);  
     return rb_class;
 }
 
@@ -1233,7 +1238,7 @@ void _rb_objc_rebuild_main_bundle()
 {
     NSString *path, *s;
     NSBundle *b;
-    id pool = [NSAutoreleasePool new];		
+    CREATE_AUTORELEASE_POOL(pool);		
 
       
     // Get access to the current main bundle
@@ -1269,7 +1274,7 @@ void _rb_objc_rebuild_main_bundle()
     /* patch the main Bundle path */
     [b initWithPath:path];
 
-    [pool release];		
+    DESTROY(pool);
 
 }
 
@@ -1320,7 +1325,7 @@ void _rb_objc_initialize_process_context(VALUE rb_argc, VALUE rb_argv)
 {
     NSProcessInfo *pi = nil;
     BOOL properProcessInitDone = NO;
-    id pool = [NSAutoreleasePool new];		
+    CREATE_AUTORELEASE_POOL(pool);		
         
     
     // rebuild our own argc and argv from what Ruby gives us
@@ -1376,7 +1381,7 @@ void _rb_objc_initialize_process_context(VALUE rb_argc, VALUE rb_argv)
     
     NSDebugLog(@"New Main Bundle path: %@", [[NSBundle mainBundle] bundlePath]);
 
-    [pool release];
+    DESTROY(pool);
     
 }
 
