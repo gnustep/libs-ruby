@@ -3,6 +3,22 @@ News
 
 The currently released version of RIGS is `0.2.0'.
 
+Noteworthy changes in Version 0.2.1
+===================================
+   * Modified initialization process when Ruby is invoked from
+     within an GNUstep application C program.
+   * Objective C structures are now handled as CStruct objects in
+     Ruby instead of plain Ruby Array. Allow the redefinition of
+     method NSRect size and NSRange length without overriding
+     those from the native Array class
+   * GSTable, GSVbox, GSHbox now imported with the Foundation 
+     module in Ruby. (GNUstep specific classes)
+   * Currency Converter GUI application written in Ruby available
+     in the Examples directory
+
+See ChangeLog for more details
+
+
 Noteworthy changes in Version 0.2.0
 ===================================
 
