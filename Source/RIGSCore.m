@@ -1245,11 +1245,18 @@ void _rb_objc_rebuild_main_bundle()
     b = [NSBundle mainBundle];
     NSDebugLog(@"Current Main Bundle path: %@", [b bundlePath]);
 
-    // Rebuild the real path to Ruby Tool/Application
+    // Rebuild the real path to Ruby Application
     path = [[[NSProcessInfo processInfo] arguments] objectAtIndex: 0];
     path = [NSBundle _absolutePathOfExecutable: path];
     path = [path stringByDeletingLastPathComponent];
 
+    // If path is nil then we are probably executing a tool or the Ruby application
+    // was launched without an appropriate openapp. In this case there is nothing
+    // we can do
+    if (path == nil) {
+      return;
+    }
+    
     // For some reason _library_combo, _gnustep_target_* methods are not
     // visible (why?) so simply strip the 3 path components assuming they are
     // here (FIXME?)
@@ -1324,6 +1331,7 @@ _rb_objc_rebuild_argc_argv(VALUE rb_argc, VALUE rb_argv)
 void _rb_objc_initialize_process_context(VALUE rb_argc, VALUE rb_argv)
 {
     NSProcessInfo *pi = nil;
+    NSString *topProgram;
     BOOL properProcessInitDone = NO;
     CREATE_AUTORELEASE_POOL(pool);		
         
@@ -1354,6 +1362,19 @@ void _rb_objc_initialize_process_context(VALUE rb_argc, VALUE rb_argv)
     }
 
     NSDebugLog(@"Arguments in NSProcessInfo before rebuild: %@",[[NSProcessInfo processInfo] arguments]);
+    
+    // If the top level program being executed is not the ruby interpreter then
+    // we are probably executing Ruby scripts from within an embedded Scripts
+    // In this case do not rework the process context.
+    // FIXME: Find a better way to determine that ruby was not the top level 
+    // program but that a ObjC program - embedding a Ruby script - is
+    topProgram = [[[NSProcessInfo processInfo] arguments] objectAtIndex: 0];
+    if ( ![topProgram hasSuffix: @"ruby"] ) {
+      // We are not executing from a top level Ruby interpreter
+      NSDebugLog(@"Top level program (%@) not a ruby interpreter. Process context untouched", topProgram);
+      return;
+      
+    }
     
     // At this point we do have a properly initialize processInfo structure
     // so now patch the mainBundle to reflect the real location of the Ruby
