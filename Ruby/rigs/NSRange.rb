@@ -24,24 +24,26 @@
 #    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111 USA.
 #
 
-class NSRange
+require 'rigs/CStruct'
+
+class NSRange < CStruct
 
     # Define a "fake" new method that simply returns 
-    # an array
+    # a CStruct object
     def NSRange.new(location, length)
-	if ( !location.integer? || location<0 )
-	    raise ArgumentError,"NSRange 'location' is not an integer", caller
+	newRange = CStruct[location, length]
+    	if (newRange._validRange?)
+	    return newRange
+	else
+	    raise ArgumentError,"NSRange 'location' or 'length' argument not valid", caller
 	end
-	if ( !length.integer? || length<0 )
-	    raise ArgumentError,"NSRange 'length' is not an integer", caller
-	end
-
-	[location, length]
     end
 
 end
 
-class Array
+# These methods cannot be defined in NSRange because Obj C structures
+# are not typed and always returned as CStruct never as NSRange.
+class CStruct
     
     def location
 	self[0]
@@ -51,8 +53,7 @@ class Array
 	self[0] = aLocation
     end
 
-    # Remark: Can't use 'length' because it overrides the native Array method :-((
-    def rlength
+    def length
 	self[1]
     end
 
@@ -81,11 +82,6 @@ class Array
     def emptyRange?
 	(self.rlength == 0)
     end
-
-    def description
-	"{location=#{self.location}; length=#{self.rlength}}";
-    end
-
 
     def rangeByIntersectingRange (aRange)
 	newRange = self.dup
@@ -138,6 +134,11 @@ class Array
 
 	self.location = newLocation
 	self.rlength = newLength
+    end
+
+    def _validRange?
+	(self.kind_of? CStruct) && (self.array_size == 2) &&
+	(self[0].kind_of? Integer) && (self[1].kind_of? Integer)
     end
 
 end

@@ -24,32 +24,36 @@
 #    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111 USA.
 #
 
-class NSRect
+require 'rigs/CStruct'
+require 'rigs/NSPoint'
+require 'rigs/NSSize'
+
+class NSRect < CStruct
 
     # Define a "fake" new method that simply returns 
     # an array
     def NSRect.new(x=0,y=0,width=0,height=0)
-	[NSPoint.new(x,y), NSSize.new(width,height)]
+	CStruct[NSPoint.new(x,y), NSSize.new(width,height)]
     end
 
 end
 
-class Array
+class CStruct
 
     def x
-	if ( self[0].type == Array )
+	if ( self[0].kind_of? CStruct )
 	    # it is a Rectangle
 	    self[0][0]
 	elsif ( self[0].kind_of? Numeric )
 	    #it is a point
 	    self[0]
 	else
-	    raise ArgumentError,"x is neither an Array nor a Number", caller
+	    raise ArgumentError,"x is neither an CStruct nor a Number", caller
 	end
     end
 
     def x= (anX)
-	if ( self[0].type == Array )
+	if ( self[0].kind_of? CStruct )
 	    if ( !anX.kind_of? Numeric )
 		raise ArgumentError,"NSRect 'x' is not a number", caller
 	    end
@@ -60,22 +64,22 @@ class Array
 	    end
 	    self[0] = anX
 	else
-	    raise ArgumentError,"x is neither an Array nor a Number", caller
+	    raise ArgumentError,"x is neither an CStruct nor a Number", caller
 	end
     end
 
     def y
-	if ( self[0].type == Array )
+	if ( self[0].kind_of? CStruct )
 	    self[0][1]
 	elsif ( self[1].kind_of? Numeric )
 	    self[1]
 	else
-	    raise ArgumentError,"y is neither an Array nor a Number", caller
+	    raise ArgumentError,"y is neither an CStruct nor a Number", caller
 	end
     end
 
     def y= (anY)
-	if ( self[0].type == Array )
+	if ( self[0].kind_of? CStruct )
 	    if ( !anY.kind_of? Numeric )
 		raise ArgumentError,"NSRect 'y' is not a number", caller
 	    end
@@ -86,24 +90,24 @@ class Array
 	    end
 	    self[1] = anY
 	else
-	    raise ArgumentError,"y is neither an Array nor a Number", caller
+	    raise ArgumentError,"y is neither an CStruct nor a Number", caller
 	end
     end
 
     def width
-	if ( self[1].type == Array )
+	if ( self[1].kind_of? CStruct )
 	    # it is a Rect
 	    self[1][0]
 	elsif ( self[0].kind_of? Numeric )
 	    # it is a Size
 	    self[0]
 	else
-	    raise ArgumentError,"width is neither an Array nor a Number", caller
+	    raise ArgumentError,"width is neither an CStruct nor a Number", caller
 	end
     end
  
     def width= (aWidth)
-	if ( self[1].type == Array )
+	if ( self[1].kind_of? CStruct )
 	    if ( !aWidth.kind_of? Numeric )
 		raise ArgumentError,"NSRect 'width' is not a number", caller
 	    end
@@ -114,24 +118,24 @@ class Array
 	    end
 	    self[0] = aWidth
 	else
-	    raise ArgumentError,"width is neither an Array nor a Number", caller
+	    raise ArgumentError,"width is neither an CStruct nor a Number", caller
 	end
     end
 
     def height
-	if ( self[1].type == Array )
+	if ( self[1].kind_of? CStruct )
 	    # it is a Rect
 	    self[1][1]
 	elsif ( self[1].kind_of? Numeric )
 	    # it is a Size
 	    self[1]
 	else
-	    raise ArgumentError,"height is neither an Array nor a Number", caller
+	    raise ArgumentError,"height is neither an CStruct nor a Number", caller
 	end
     end
  	
     def height= (aHeight)
-	if ( self[1].type == Array )
+	if ( self[1].kind_of? CStruct )
 	    if ( !aHeight.kind_of? Numeric )
 		raise ArgumentError,"NSRect 'height' is not a number", caller
 	    end
@@ -142,28 +146,53 @@ class Array
 	    end
 	    self[1] = aHeight
 	else
-	    raise ArgumentError,"height is neither an Array nor a Number", caller
+	    raise ArgumentError,"height is neither an CStruct nor a Number", caller
 	end
     end
 
     def origin
-	if ( self[0].type == Array )
+	if ( self._validRect? )
 	    self[0]
 	else
-	    raise ArgumentError,"NSRect origin is not Array", caller
+	    raise ArgumentError,"origin receiver not a valid NSRect", caller
 	end
     end
 
-    # Remark: Can't use "size" because it is a native method of Array
-    # which return the actual number of elements in the array
-    def rsize
-	if ( self[1].type == Array )
+    def origin= (anOrigin)
+	
+	if (!anOrigin._validPoint?)
+	    raise ArgumentError,"origin argument not a valid NSPoint", caller
+	end
+	    
+	if (self._validRect?)
+	    self[0] = anOrigin
+	else
+	    raise ArgumentError,"receiver is not a valid NSRect", caller
+	end
+	
+    end
+
+    def size
+	if ( self._validRect? )
 	    self[1]
 	else
-	    raise ArgumentError,"NSRect size is not Array", caller
+	    raise ArgumentError,"size  receiver not a valid NSRect", caller
 	end
     end
 
+    def size= (aSize)
+	
+	if (!aSize._validSize?)
+	    raise ArgumentError,"size argument not a valid NSSize", caller
+	end
+	    
+	if (self._validRect?)
+	    self[1] = aSize
+	else
+	    raise ArgumentError,"receiver is not a valid NSRect", caller
+	end
+	
+    end
 
     def maxX
 	self.x + self.width
@@ -350,6 +379,11 @@ class Array
 	rect = self.dup
 	rect.unionRect!(aRect)
 	rect
+    end
+
+    def _validRect?
+	(self.kind_of? CStruct) && (self.array_size == 2) &&
+	self[0]._validPoint? && self[1]._validSize?
     end
 
 end # class definition

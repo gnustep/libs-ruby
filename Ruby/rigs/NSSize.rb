@@ -24,24 +24,24 @@
 #    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111 USA.
 #
 
-class NSSize
+require 'rigs/CStruct'
+
+class NSSize < CStruct
 
     # Define a "fake" new method that simply returns 
-    # an array
+    # a CStruct
     def NSSize.new(width, height)
-	if ( !width.kind_of?(Numeric) )
-	    raise ArgumentError,"NSSize 'width' is not a number", caller
+	newSize = CStruct[width, height]
+	if (newSize._validSize?)
+	    return newSize
+	else
+	    raise ArgumentError,"NSSize 'x' or 'y' argument not valid", caller
 	end
-	if ( !height.kind_of?(Numeric) )
-	    raise ArgumentError,"NSSize 'height' not an number", caller
-	end
-
-	[width, height]
     end
 
 end
 
-class Array
+class CStruct
 
     def equalToSize? (aSize)
 	self == aSize
@@ -49,6 +49,11 @@ class Array
 
     def emptySize?
 	(self.width == 0) || (self.height == 0)
+    end
+
+    def _validSize?
+	( (self.kind_of? CStruct) && (self.array_size == 2) &&
+	(self[0].kind_of? Numeric) && (self[1].kind_of? Numeric) )
     end
 
 end
