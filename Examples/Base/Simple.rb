@@ -27,10 +27,15 @@
 #
 
 require 'rigs'
-Rigs.import("NSString")
-Rigs.import("NSMutableString")
-Rigs.import("NSArray")
-Rigs.import("NSMutableArray")
+
+# You can drag all Foundation Classes at once or ....
+require 'Foundation'
+
+# ... get only those you need  one by one
+#Rigs.import("NSString")
+#Rigs.import("NSMutableString")
+#Rigs.import("NSArray")
+#Rigs.import("NSMutableArray")
 
 $STRING_AUTOCONVERT = false
 $SELECTOR_AUTOCONVERT = false
@@ -72,7 +77,7 @@ print "a isEqualToString a: ", a.isEqualToString(a),"\n"
 print "b isEqualToString c: ", b.isEqualToString(c),"\n"
 print "d isEqualToString c: ", d.isEqualToString(c),"\n"
 
-# These 2 doesn't work yet
+# tranform a NSString into a number
 print "f as a floating point number = ",f.floatValue,"\n"
 print "d as a double floating point number = ",f.doubleValue,"\n"
 
