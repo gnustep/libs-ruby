@@ -1,9 +1,12 @@
 # NSDictionary.rb - Add a couple of things to the NSDictionary class
+#
+#  $Id$
+#
 #    Copyright (C) 2001 Free Software Foundation, Inc.
 #   
 #    Written by:  Laurent Julliard <laurent@julliard-online.org>
-#    Date: Sept 2001
-#   
+#    Date: September 2001
+#  
 #    This file is part of the GNUstep RubyInterface Library.
 #
 #    This library is free software; you can redistribute it and/or
@@ -19,6 +22,7 @@
 #    You should have received a copy of the GNU Library General Public
 #    License along with this library; if not, write to the Free
 #    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111 USA.
+#
 
 NSDictionary = Rigs.class("NSDictionary")
 
