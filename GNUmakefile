@@ -26,7 +26,7 @@ include $(GNUSTEP_MAKEFILES)/common.make
 
 PACKAGE_NAME = rigs
 # Keep it in sync manually with Source/GNUmakefile
-VERSION = 0.1.0
+VERSION = 0.2.0
 
 GNUSTEP_INSTALLATION_DIR=$(GNUSTEP_LOCAL_ROOT)
 RPM_DISABLE_RELOCATABLE=YES

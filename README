@@ -36,7 +36,7 @@ license. (Some sample Ruby scripts are under GPL)
 Disclaimer
 ==========
 
-CAUTION!! This is very alpha software. It is still work in progress
+CAUTION!! This is alpha software. It is still work in progress
 both because the project is just starting and because I'm new to
 GNUstep and I'm learning as I go. However you can already play with
 it, report problems and contribute new code. (See the Examples and
@@ -71,7 +71,7 @@ To use the RIGS, you need:
 
   * GNUstep make package and base library.
 
-  * A properly installed ruby environment version 1.6.4 or higher
+  * A properly installed ruby environment version 1.6.4 or later
 
 Special Thanks
 ==============
