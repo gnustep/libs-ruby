@@ -32,7 +32,8 @@ RUBY_SITE_LIB_DIR := $(shell ruby -rrbconfig -e 'print Config::CONFIG["sitelibdi
 
 
 after-install::
-	@cp -f rigs.rb $(RUBY_SITE_LIB_DIR)
+	@cp -f rigs.rb Foundation.rb AppKit.rb $(RUBY_SITE_LIB_DIR)
+	@rm -rf $(RUBY_SITE_LIB_DIR)/rigs/*
 	@cp -rf rigs $(RUBY_SITE_LIB_DIR)
 
 # Is there something more appropriate than tool.make here ?
