@@ -1,5 +1,40 @@
-Preamble
-========
+What is RIGS ?
+==============
+
+RIGS stands for Ruby Interface for GNUstep. It is a package allowing
+integration between Ruby and Objective-C/GNUstep. The main purpose of
+RIGS is to allow the use the GNUstep development environment from
+Ruby. 
+
+One of the most interesting feature of RIGS is that it is 100%
+dynamic. It means that RIGS maps Ruby object/methods to GNUstep and
+vice/versa entirely on the fly when running the Ruby script. As a
+consequence there is no need to generate any kind of wrapping code to
+use either existing GNUstep classes or even new ones that you have
+developped by yourself. Simply compile your new classes in a shared
+library and then do a simple:
+
+require('MyNewClass')       # load your extra ObjC shared library
+Rigs.import("MyNewClass")   # dynamically import the class in Ruby
+
+and you are in business! Cool, hey.
+
+RIGS allows you to write optimized classes and components in
+Objective-C, and make them available to Ruby developers. Ruby is a
+great OO programming language and it is real fun to write GNUstep
+applications directly from Ruby.
+
+By the way GNUstep users who doesn't known Ruby can learn more at
+http://www.ruby-lang.org. And Ruby users that doesn't know about
+GNUstep can go to http://www.gnustep.org. In both cases, it's
+definitely worth a visit.
+
+RIGS is free software and part of the GNU/GNUstep project, freely
+available from the Free Software Foundation under the GNU LGPL
+license. (Some sample Ruby scripts are under GPL)
+
+Disclaimer
+==========
 
 CAUTION!! This is very alpha software. It is still work in progress
 both because the project is just starting and because I'm new to
@@ -8,48 +43,9 @@ it, report problems and contribute new code. (See the Examples and
 Testing directories for code samples). For known limitations see the
 TODO file.
 
-
-What is RIGS ?
-==============
-
-RIGS stands for Ruby Interface for GnuStep. It is a package allowing
-integration between Ruby and Objective-C/GNUstep. The main purpose of
-RIGS is to allow Ruby programmers to use the GNUstep libraries from
-Ruby.
-
 RIGS is very similar in spirit to JIGS, the remarkable Java to GNUstep
-interface written by Nicola Pero. Like JIGS, RIGS allows you to use
-the GNUstep environment from Ruby. However, unlike JIGS, RIGS doesn't
-(yet) allow a full use of Ruby classes from Objective C.For the time
-RIGS is mostly geared towards the use of the GNUstep development
-environment from Ruby and not the other way around.
-
-One of the most interesting feature of RIGS is that it is 100%
-dynamic. It means that RIGS maps Ruby object/methods to GNUStep and
-vice/versa entirely on the fly when running the Ruby script. As a
-consequence there is no need to generate any kind of wrapping code to
-use either existing GNUstep classes or even new ones that you have
-developped by yourself. Simply compile your new classes in a shared
-library and then do a simple:
-
-require('rigs')
-require('MyNewClass')       # load the ObjC shared library
-Rigs.import("MyNewClass")   # dynamically import the class in Ruby
-
-and you are in business! Cool, hey.
-
-RIGS allows you to write optimized classes and components in
-Objective-C, and make them available to Ruby developers. I found Ruby
-to be a very nice language and felt like it would be great to
-prototype GNUstep applications directly from Ruby. GNUstep already had
-Gava and Guile as a scripting language, now there is Ruby as well...
-
-By the way if you don't know Ruby, go to http://www.ruby-lang.org.
-It's definitely worth a visit. Ruby is such a cool programming language
-
-RIGS is free software and part of the GNU/GNUstep project, freely
-available from the Free Software Foundation under the GNU LGPL
-license. (Some sample Ruby scripts are under GPL)
+interface written by Nicola Pero. However, unlike JIGS, RIGS doesn't
+focus on accessing Ruby classes from Objective C.
 
 Authors
 =======
@@ -94,9 +90,11 @@ Windows and on MAC OS X.
 Obtaining RIGS
 ==============
 
-RIGS is available at ftp://ftp.gnustep.org/pub/gnustep/dev-libs/ New
-releases are posted on the GNUstep mailing lists (see
-https://savannah.gnu.org/mail/?group_id=99)
+RIGS is available at ftp://ftp.gnustep.org/pub/gnustep/libs/
+
+New releases are posted on the GNUstep mailing lists (see
+https://savannah.gnu.org/mail/?group_id=99) as well as ruby mailing
+lists.
 
 You may always get the latest version of RIGS from the GNUstep CVS -
 the module is called 'ruby'. Instructions to checkout a working copy
