@@ -1,7 +1,15 @@
 News
 ****
 
-The currently released version of RIGS is `0.2.1'.
+The currently released version of RIGS is `0.2.2'.
+
+Noteworthy changes in Version 0.2.2
+===================================
+   * When building Objective-C selector for Ruby methods that accept 
+     a variable number of arguments (which Ruby returns as a negative 
+     number), use the absolute value of Ruby's arity instead of simply 
+     skipping the method. (See TODO.)
+
 
 Noteworthy changes in Version 0.2.1
 ===================================

@@ -17,6 +17,8 @@ free enough memory. This has to checked thoroughly.
 NSArray above)
 
 - handle calls to ObjC methods with a variable number of arguments
+  (fixed by taking the absolute value of Ruby's arity; there's probably 
+  a better way to do this)
 
 - Write documentation
 
