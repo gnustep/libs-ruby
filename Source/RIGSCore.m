@@ -814,7 +814,7 @@ rb_objc_send(char *method, int rb_argc, VALUE *rb_argv, VALUE rb_self)
 
     NSDebugLog(@"<<<< Invoking method %s with %d argument(s) on Ruby VALUE 0x%lx (Objc id 0x%lx)",method, rb_argc, rb_self);
 
-    sel = SelectorFromRubyName(method, rb_argc > 0);
+    sel = SelectorFromRubyName(method, rb_argc);
     DESTROY(pool);
 
     return rb_objc_send_with_selector(sel, rb_argc, rb_argv, rb_self);

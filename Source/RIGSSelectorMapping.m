@@ -91,26 +91,45 @@
 
 
 NSString *
-SelectorStringFromRubyName (char *name, BOOL hasArgs)
+SelectorStringFromRubyName (char *name, int numArgs)
 {
 	id selname  = [NSString stringWithCString: name];
         
 	selname = [[selname componentsSeparatedByString: @"_"]
 				componentsJoinedByString: @":"];
 
+        // Setters in Ruby often end with an "=" sign. Drop it.
 	if([selname hasSuffix: @"="])
           selname = [selname substringToIndex: [selname length] - 1];
 			
-	if(hasArgs && ![selname hasSuffix: @":"])
-		selname = [selname stringByAppendingString: @":"];
-	
+
+        /* Figure out how many colons we need to add at the end
+                  (this is for ObjC methods with unnamed arguments in the
+                  method selector) */
+        {
+          int diffNum,i;
+          int curNum = 0;
+          char *ch = name;
+
+          // How many underscores are in the  Ruby method name
+          while (*ch++) {
+            if(*ch == '_') ++curNum;
+          }
+
+          // Add missing ":" at the end
+          diffNum = numArgs - curNum;
+          for(i=0;i<diffNum;i++) {
+            selname = [selname stringByAppendingString: @":"];
+          }
+        }
+
 	return (selname);
 }
 
 SEL
-SelectorFromRubyName (char *name, BOOL hasArgs)
+SelectorFromRubyName (char *name, int numArgs)
 {
-  return NSSelectorFromString(SelectorStringFromRubyName(name, hasArgs));
+  return NSSelectorFromString(SelectorStringFromRubyName(name, numArgs));
 }
 
 NSString *
@@ -126,7 +145,11 @@ RubyNameFromSelectorString(NSString *name)
     name = [[name componentsSeparatedByString: @":"]
               componentsJoinedByString: @"_"];
 
-    if([name hasSuffix: @"_"])
+    /* Can have multiple _ at the end if the ObjC method doesn't use
+           named arguments like:
+           + (void)DrawRect: (float)x1 :(float)y1 :(float)x2 :(float)y2;
+      */
+    while ([name hasSuffix: @"_"])
         name = [name substringToIndex: [name length] - 1];
 
     return name;

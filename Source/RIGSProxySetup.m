@@ -172,7 +172,7 @@ Class _RIGS_register_ruby_class (VALUE rb_class)
         nbArgs = _RIGS_ruby_method_arity(rb_class_name, rb_mth_name);
       
  
-        objcMthName = SelectorStringFromRubyName(rb_mth_name, (nbArgs>0));
+        objcMthName = SelectorStringFromRubyName(rb_mth_name, nbArgs);
 
         NSDebugLog(@"Ruby method %s has %d arguments",rb_mth_name,nbArgs);
 
