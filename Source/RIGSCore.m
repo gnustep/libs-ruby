@@ -38,6 +38,7 @@
 
 #ifdef GNUSTEP
 #include <objc/encoding.h>
+#include <mframe.h>  // For the definition of the ROUND macro
 #endif
 
 /* Do not include the whole <Foundation/Foundation.h> to avoid
@@ -46,6 +47,7 @@
 #include <Foundation/NSAutoreleasePool.h>
 #include <Foundation/NSException.h>
 #include <Foundation/NSInvocation.h>
+#include <Foundation/NSMapTable.h>
 #include <Foundation/NSSet.h>
 #include <Foundation/NSProcessInfo.h>
 #include <Foundation/NSDictionary.h>
@@ -63,13 +65,19 @@
 #include "RIGSProxySetup.h"
 #include "RIGSNSApplication.h"
 
+// Our own argc and argv rebuilt  from Ruby ARGV ($*)
+char **ourargv;
+int ourargc;
+extern char** environ;
+
+
 static char *rigsVersion = RIGS_VERSION;
 
-// Dictionary that maps ObjC class to Ruby class VALUE
-static NSMutableDictionary *classValue;
+// Hash table  that maps known ObjC class to Ruby class VALUE
+static NSMapTable *knownClasses = 0;
 
-// Dictionary that maps ObjC objects to Ruby object VALUE
-static NSMutableDictionary *objectValue;
+// Hash table that maps known ObjC objects to Ruby object VALUE
+static NSMapTable *knownObjects = 0;
 
 // Rigs Ruby module
 static VALUE rb_mRigs;
@@ -92,6 +100,18 @@ static VALUE selectorAutoConvert = Qfalse;
 #define IS_SELECTOR_AUTOCONVERT_ON() \
 (selectorAutoConvert == Qtrue)
 
+/* map to global Ruby variable $NUMBER_AUTOCONVERT
+   If true Ruby numbers can be passed to Obj C where an 
+   NSNumber is expected and conversely NSNumber returned
+   to Ruby are converted to Ruby number
+   If false then Ruby will be returned NSNumber objects. Arguments
+   passed as Ruby number will however be translated to NSNumber
+  in all cases */
+static VALUE numberAutoConvert = Qfalse;
+
+#define IS_NUMBER_AUTOCONVERT_ON() \
+(numberAutoConvert == Qtrue)
+
 
 
 
@@ -99,37 +119,49 @@ void
 rb_objc_release(id objc_object) 
 {
     NSDebugLog(@"Call to ObjC release on 0x%lx",objc_object);
-    [objectValue removeObjectForKey: objc_object];
-    [objc_object release];
+
+    if (objc_object != nil) {
+        CREATE_AUTORELEASE_POOL(pool);
+        /* Use an autorelease pool here because both `repondsTo:' and
+                 `release' could autorelease objects. */
+
+        NSMapRemove(knownObjects, (void*)objc_object);
+      if ([objc_object respondsToSelector: @selector(release)])
+	{
+	  [objc_object release];
+	}
+      DESTROY(pool);
+    }
+ 
 }
 
 
 void
-rb_objc_mark(VALUE ruby_object) 
+rb_objc_mark(VALUE rb_object) 
 {
     // Doing nothing for the moment
-    NSDebugLog(@"Call to ObjC marking on 0x%lx",ruby_object);
+    NSDebugLog(@"Call to ObjC marking on 0x%lx",rb_object);
 }
 
 
 VALUE
-rb_objc_new(int argc, VALUE *argv, VALUE class)
+rb_objc_new(int rb_argc, VALUE *rb_argv, VALUE rb_class)
 {
     id pool = [[NSAutoreleasePool alloc] init];
     id obj;
     VALUE new_rb_object;
    
     // get the class from the objc_class class variable now
-    Class objc_class = (Class) NUM2UINT(rb_iv_get(class, "@objc_class"));
+    Class objc_class = (Class) NUM2UINT(rb_iv_get(rb_class, "@objc_class"));
     
     // Normally new method has no arg in objective C. If you want it to have one
     // when called fom Ruby then override the new method from the Ruby side
     // See NSSelector.rb for an example
-    obj  = [[objc_class new] retain];
-    new_rb_object = Data_Wrap_Struct(class, 0, rb_objc_release, obj);
-    
-    [objectValue setObject:[NSNumber numberWithUnsignedLong:new_rb_object]
-                    forKey:obj ];
+    //obj  = [[[objc_class alloc] init] retain];
+    obj  = [[objc_class alloc] init];
+    new_rb_object = Data_Wrap_Struct(rb_class, 0, rb_objc_release, obj);
+
+    NSMapInsertKnownAbsent(knownObjects, (void*)obj, (void*)new_rb_object);
 
     NSDebugLog(@"Creating new object of Class %@ (id = 0x%lx, VALUE = 0x%lx)",
                NSStringFromClass([objc_class class]), obj, new_rb_object);
@@ -139,405 +171,497 @@ rb_objc_new(int argc, VALUE *argv, VALUE class)
 }
 
 BOOL
-rb_objc_convert_to_objc(VALUE rb_val,void *data, const char *type)
+rb_objc_convert_to_objc(VALUE rb_thing,void *data, int offset, const char *type)
 {
-  BOOL ret = YES;
-  Class objcClass;
-  NSString *msg;
-  VALUE rb_class_val;
-
+    BOOL ret = YES;
+    Class objcClass;
+    NSString *msg;
+    VALUE rb_class_val;
+    int idx = 0;
+    BOOL inStruct = NO;
   
-  // If Ruby gave the NIL value then bypass all the rest
-  if(NIL_P(rb_val)) {
-    *(id*)data = (id) nil;
-    return YES;
-  } 
+ 
+    // If Ruby gave the NIL value then bypass all the rest
+    // (FIXME?) Check if it should be handled differently depending
+    //  on the ObjC type.
+    if(NIL_P(rb_thing)) {
+        *(id*)data = (id) nil;
+        return YES;
+    } 
   
-  // All other cases
-  switch (*type) {
-      
-  case _C_ID:
-  case _C_CLASS:
+  
+    if (*type == _C_STRUCT_B) {
+        inStruct = YES;
+        while (*type != _C_STRUCT_E && *type++ != '=');
+        if (*type == _C_STRUCT_E) {
+            return YES;
+        }
+    }
 
-    switch (TYPE(rb_val))
-      {
-      case T_DATA:
-        Data_Get_Struct(rb_val,id,* (id*)data);
-          
-        /* Automatic conversion from string -- see below _C_SEL case
-           if ([ret class] == [NSSelector class]) {
-           ret = [ret getSEL];
-           NSDebugLog(@"Extracting ObjC SEL (0x%lx) from NSSelector object", ret);
-           } */
-          
-        break;
-          
-          
-      case T_STRING:
-        /* Ruby sends a string to a ObjC method waiting for an id
-                  so convert it to NSString automatically */
-        *(NSString**)data = [NSString stringWithCString: STR2CSTR(rb_val)];
-        break;
-          
-      case T_OBJECT:
-      case T_CLASS:
-        /* Ruby sends a Ruby class or a ruby object. Automatically register
-                 an ObjC proxy class. It is very likely that we'll need it in the future
-                 (e.g. typical for setDelegate method call) */
-        rb_class_val = (TYPE(rb_val) == T_CLASS ? rb_val : CLASS_OF(rb_val));
-        NSDebugLog(@"Converting object of Ruby class: %s", rb_class2name(rb_class_val));
-        objcClass = _RIGS_register_ruby_class(rb_class_val);
-        *(id*)data = (id)[objcClass objectWithRubyObject: rb_val];
-        NSDebugLog(@"Wrapping Ruby Object of type: 0x%02x (ObjC object at 0x%lx)",TYPE(rb_val), *(id*)data);
-        break;
-          
-      case T_ARRAY:
-      case T_HASH:
-        /* For hashes and array do not create ObjC proxy for the moment 
-                  FIXME?? Should probably be handled like T_OBJECT and T_CLASS */
-        *(id*)data = (id) [RIGSWrapObject objectWithRubyObject: rb_val];
-        NSDebugLog(@"Wrapping Ruby Object of type: 0x%02x (ObjC object at 0x%lx)",TYPE(rb_val), *(id*)data);
-        break;
-
-      case T_FIXNUM:
-        // automatic morphing into a NSNumber Int
-        *(NSNumber**)data = [NSNumber numberWithInt: FIX2INT(rb_val)];
-        break;
+    do {
         
-      case T_BIGNUM:
-          // Possible overflow because bignum can be very big!!!
-          // FIXME: not sure how to check the overflow
-          *(NSNumber**)data = [NSNumber numberWithInt: FIX2INT(rb_val)];
-        break;
+        int	align = objc_alignof_type(type); /* pad to alignment */
+        void	*where;
+        VALUE	rb_val;
+   
+        offset = ROUND(offset, align);
+        where = data + offset;
+        offset += objc_sizeof_type(type);
 
-      case T_FLOAT:
-        // Map it to double in any case to be sure there isn't any overflow
-        *(NSNumber**)data = [NSNumber numberWithDouble: NUM2DBL(rb_val)];
-        break;
+       NSDebugLog(@"Converting Ruby value (0x%lx, type 0x%02lx) to ObjC value of type '%c' at target address 0x%lx)",
+                   rb_thing, TYPE(rb_thing),*type,where);
 
-      case T_FALSE:
-        *(BOOL*)data = NO;
-        break;
-
-      case T_TRUE:
-        *(BOOL*)data = YES;
-        break;
-
-      default:
-        ret = NO;
-        break;
-                
-      }
-    break;
-
-  case _C_SEL:
-    if (TYPE(rb_val) == T_STRING) {
-            
-      *(SEL*)data = NSSelectorFromString([NSString stringWithCString: STR2CSTR(rb_val)]);
-            
-    } else if (TYPE(rb_val) == T_DATA) {
-
-        // This is in case the selector is passed as an instance of NSSelector
-        // which is a class the we have created
-        id object;
-        Data_Get_Struct(rb_val,id,object);
-        if ([object isKindOfClass: [NSSelector class]]) {
-            *(SEL*)data = [object getSEL];
+        if (inStruct) {
+            rb_val = rb_ary_entry(rb_thing,(long) idx);
+            idx++;
         } else {
-            ret = NO;
+            rb_val = rb_thing;
         }
 
-    } else {
-        ret = NO;
-    }
-    break;
+        // All other cases
+        switch (*type) {
+      
+        case _C_ID:
+        case _C_CLASS:
+
+            switch (TYPE(rb_val))
+                {
+                case T_DATA:
+                    Data_Get_Struct(rb_val,id,* (id*)where);
+          
+                    /* Automatic conversion from string -- see below _C_SEL case
+                       if ([ret class] == [NSSelector class]) {
+                       ret = [ret getSEL];
+                       NSDebugLog(@"Extracting ObjC SEL (0x%lx) from NSSelector object", ret);
+                       } */
+          
+                    break;
+          
+          
+                case T_STRING:
+                    /* Ruby sends a string to a ObjC method waiting for an id
+                       so convert it to NSString automatically */
+                    *(NSString**)where = [NSString stringWithCString: STR2CSTR(rb_val)];
+                    break;
+          
+                case T_OBJECT:
+                case T_CLASS:
+                    /* Ruby sends a Ruby class or a ruby object. Automatically register
+                       an ObjC proxy class. It is very likely that we'll need it in the future
+                       (e.g. typical for setDelegate method call) */
+                    rb_class_val = (TYPE(rb_val) == T_CLASS ? rb_val : CLASS_OF(rb_val));
+                    NSDebugLog(@"Converting object of Ruby class: %s", rb_class2name(rb_class_val));
+                    objcClass = _RIGS_register_ruby_class(rb_class_val);
+                    *(id*)where = (id)[objcClass objectWithRubyObject: rb_val];
+                    NSDebugLog(@"Wrapping Ruby Object of type: 0x%02x (ObjC object at 0x%lx)",TYPE(rb_val), *(id*)where);
+                    break;
+          
+                case T_ARRAY:
+                case T_HASH:
+                    /* For hashes and array do not create ObjC proxy for the moment 
+                       FIXME?? Should probably be handled like T_OBJECT and T_CLASS */
+                    *(id*)where = (id) [RIGSWrapObject objectWithRubyObject: rb_val];
+                    NSDebugLog(@"Wrapping Ruby Object of type: 0x%02x (ObjC object at 0x%lx)",TYPE(rb_val), *(id*)where);
+                    break;
+
+                case T_FIXNUM:
+                    // automatic morphing into a NSNumber Int
+                    *(NSNumber**)where = [NSNumber numberWithInt: FIX2INT(rb_val)];
+                    break;
+        
+                case T_BIGNUM:
+                    // Possible overflow because bignum can be very big!!!
+                    // FIXME: not sure how to check the overflow
+                    *(NSNumber**)where = [NSNumber numberWithInt: FIX2INT(rb_val)];
+                    break;
+
+                case T_FLOAT:
+                    // Map it to double in any case to be sure there isn't any overflow
+                    *(NSNumber**)where = [NSNumber numberWithDouble: NUM2DBL(rb_val)];
+                    break;
+
+                case T_FALSE:
+                    *(BOOL*)where = NO;
+                    break;
+
+                case T_TRUE:
+                    *(BOOL*)where = YES;
+                    break;
+
+                default:
+                    ret = NO;
+                    break;
+                
+                }
+            break;
+
+        case _C_SEL:
+            if (TYPE(rb_val) == T_STRING) {
+            
+                *(SEL*)where = NSSelectorFromString([NSString stringWithCString: STR2CSTR(rb_val)]);
+            
+            } else if (TYPE(rb_val) == T_DATA) {
+
+                // This is in case the selector is passed as an instance of NSSelector
+                // which is a class the we have created
+                id object;
+                Data_Get_Struct(rb_val,id,object);
+                if ([object isKindOfClass: [NSSelector class]]) {
+                    *(SEL*)where = [object getSEL];
+                } else {
+                    ret = NO;
+                }
+
+            } else {
+                ret = NO;
+            }
+            break;
  
 
-  case _C_CHR:
-    if ((TYPE(rb_val) == T_FIXNUM) || (TYPE(rb_val) == T_STRING)) 
-      *(char*)data = (char) NUM2CHR(rb_val);
-    else
-      ret = NO;
-    break;
+        case _C_CHR:
+            if ((TYPE(rb_val) == T_FIXNUM) || (TYPE(rb_val) == T_STRING)) 
+                *(char*)where = (char) NUM2CHR(rb_val);
+            else
+                ret = NO;
+            break;
 
-  case _C_UCHR:
-    if ( ((TYPE(rb_val) == T_FIXNUM) && FIX2INT(rb_val)>=0) ||
-         (TYPE(rb_val) == T_STRING)) 
-      *(char*)data = (char) NUM2CHR(rb_val);
-    else if (TYPE(rb_val) == T_TRUE)
-      *(unsigned char*)data = YES;
-    else if (TYPE(rb_val) == T_FALSE)
-      *(unsigned char*)data = NO;
-    else
-      ret = NO;
-    break;
+        case _C_UCHR:
+            if ( ((TYPE(rb_val) == T_FIXNUM) && FIX2INT(rb_val)>=0) ||
+                 (TYPE(rb_val) == T_STRING)) 
+                *(char*)where = (char) NUM2CHR(rb_val);
+            else if (TYPE(rb_val) == T_TRUE)
+                *(unsigned char*)where = YES;
+            else if (TYPE(rb_val) == T_FALSE)
+                *(unsigned char*)where = NO;
+            else
+                ret = NO;
+            break;
 
-  case _C_SHT:
-    if (TYPE(rb_val) == T_FIXNUM) 
-      if (FIX2INT(rb_val) <= SHRT_MAX || FIX2INT(rb_val) >= SHRT_MIN) 
-        *(short*)data = (short) FIX2INT(rb_val);
-      else {
-        NSLog(@"*** Short overflow %d",FIX2INT(rb_val));
-        ret = NO;
-      }        
-    else
-      ret = NO;
-    break;
+        case _C_SHT:
+            if (TYPE(rb_val) == T_FIXNUM) 
+                if (FIX2INT(rb_val) <= SHRT_MAX || FIX2INT(rb_val) >= SHRT_MIN) 
+                    *(short*)where = (short) FIX2INT(rb_val);
+                else {
+                    NSLog(@"*** Short overflow %d",FIX2INT(rb_val));
+                    ret = NO;
+                }        
+            else
+                ret = NO;
+            break;
 
-  case _C_USHT:
-    if (TYPE(rb_val) == T_FIXNUM) 
-      if (FIX2INT(rb_val) <= USHRT_MAX || FIX2INT(rb_val) >=0)
-        *(unsigned short*)data = (unsigned short) FIX2INT(rb_val);
-      else {
-        NSLog(@"*** Unsigned Short overflow %d",FIX2INT(rb_val));
-        ret = NO;
-      } else {
-          ret = NO;
-      }
-    break;
+        case _C_USHT:
+            if (TYPE(rb_val) == T_FIXNUM) 
+                if (FIX2INT(rb_val) <= USHRT_MAX || FIX2INT(rb_val) >=0)
+                    *(unsigned short*)where = (unsigned short) FIX2INT(rb_val);
+                else {
+                    NSLog(@"*** Unsigned Short overflow %d",FIX2INT(rb_val));
+                    ret = NO;
+                } else {
+                    ret = NO;
+                }
+            break;
 
-  case _C_INT:
-    if (TYPE(rb_val) == T_FIXNUM || TYPE(rb_val) == T_BIGNUM )
-      *(int*)data = (int) NUM2INT(rb_val);
-    else
-      ret = NO;	  
-    break;
+        case _C_INT:
+            if (TYPE(rb_val) == T_FIXNUM || TYPE(rb_val) == T_BIGNUM )
+                *(int*)where = (int) NUM2INT(rb_val);
+            else
+                ret = NO;	  
+            break;
 
-  case _C_UINT:
-    if (TYPE(rb_val) == T_FIXNUM || TYPE(rb_val) == T_BIGNUM)
-      *(unsigned int*)data = (unsigned int) NUM2INT(rb_val);
-    else
-      ret = NO;
-    break;
+        case _C_UINT:
+            if (TYPE(rb_val) == T_FIXNUM || TYPE(rb_val) == T_BIGNUM)
+                *(unsigned int*)where = (unsigned int) NUM2INT(rb_val);
+            else
+                ret = NO;
+            break;
 
-  case _C_LNG:
-    if (TYPE(rb_val) == T_FIXNUM || TYPE(rb_val) == T_BIGNUM )
-      *(long*)data = (long) NUM2INT(rb_val);
-    else
-      ret = NO;	  	
-    break;
+        case _C_LNG:
+            if (TYPE(rb_val) == T_FIXNUM || TYPE(rb_val) == T_BIGNUM )
+                *(long*)where = (long) NUM2INT(rb_val);
+            else
+                ret = NO;	  	
+            break;
 
-  case _C_ULNG:
-    if (TYPE(rb_val) == T_FIXNUM || TYPE(rb_val) == T_BIGNUM )
-      *(unsigned long*)data = (unsigned long) NUM2INT(rb_val);
-    else
-      ret = NO;	  	
-    break;
+        case _C_ULNG:
+            if (TYPE(rb_val) == T_FIXNUM || TYPE(rb_val) == T_BIGNUM )
+                *(unsigned long*)where = (unsigned long) NUM2INT(rb_val);
+            else
+                ret = NO;	  	
+            break;
 
 
-  case _C_FLT:
-    if ( (TYPE(rb_val) == T_FLOAT) || 
-         (TYPE(rb_val) == T_FIXNUM) ||
-         (TYPE(rb_val) == T_BIGNUM) ) {
+        case _C_FLT:
+            if ( (TYPE(rb_val) == T_FLOAT) || 
+                 (TYPE(rb_val) == T_FIXNUM) ||
+                 (TYPE(rb_val) == T_BIGNUM) ) {
 
-        // FIXME: possible overflow but don't know (yet) how to check it ??
-        *(float*)data = (float) NUM2DBL(rb_val);
-        NSDebugLog(@"Converting ruby value to float : %f", *(float*)data);
-    }
-    else
-      ret = NO;	  	
-    break;
+                // FIXME: possible overflow but don't know (yet) how to check it ??
+                *(float*)where = (float) NUM2DBL(rb_val);
+                NSDebugLog(@"Converting ruby value to float : %f", *(float*)where);
+            }
+            else
+                ret = NO;	  	
+            break;
 	   
 
-  case _C_DBL:
-    if ( (TYPE(rb_val) == T_FLOAT) || 
-         (TYPE(rb_val) == T_FIXNUM) ||
-         (TYPE(rb_val) == T_BIGNUM) ) {
+        case _C_DBL:
+            if ( (TYPE(rb_val) == T_FLOAT) || 
+                 (TYPE(rb_val) == T_FIXNUM) ||
+                 (TYPE(rb_val) == T_BIGNUM) ) {
         
-        // FIXME: possible overflow but don't know (yet) how to check it ??
-        *(double*)data = (double) NUM2DBL(rb_val);
-        NSDebugLog(@"Converting ruby value to double : %lf", *(double*)data);
-    }
-    else
-      ret = NO;	  	
-    break;
+                // FIXME: possible overflow but don't know (yet) how to check it ??
+                *(double*)where = (double) NUM2DBL(rb_val);
+                NSDebugLog(@"Converting ruby value to double : %lf", *(double*)where);
+            }
+            else
+                ret = NO;	  	
+            break;
 
-  case _C_CHARPTR:
-    // Inspired from the Guile interface
-    if (TYPE(rb_val) == T_STRING) {
+        case _C_CHARPTR:
+            // Inspired from the Guile interface
+            if (TYPE(rb_val) == T_STRING) {
             
-      NSMutableData	*d;
-      char		*s;
-      int		l;
+                NSMutableData	*d;
+                char		*s;
+                int		l;
             
-      s = STR2CSTR(rb_val);
-      l = strlen(s)+1;
-      d = [NSMutableData dataWithBytesNoCopy: s length: l];
-      *(char**)data = (char*)[d mutableBytes];
+                s = STR2CSTR(rb_val);
+                l = strlen(s)+1;
+                d = [NSMutableData dataWithBytesNoCopy: s length: l];
+                *(char**)where = (char*)[d mutableBytes];
             
-    } else if (TYPE(rb_val) == T_DATA) {
-      // I guess this is the right thing to do. Pass the
-      // embedded ObjC as a blob
-      Data_Get_Struct(rb_val,char* ,* (char**)data);
-    } else {
-      ret = NO;
-    }
-    break;
+            } else if (TYPE(rb_val) == T_DATA) {
+                // I guess this is the right thing to do. Pass the
+                // embedded ObjC as a blob
+                Data_Get_Struct(rb_val,char* ,* (char**)where);
+            } else {
+                ret = NO;
+            }
+            break;
    
 
-  case _C_PTR:
-    // Inspired from the Guile interface. Same as char_ptr above
-    if (TYPE(rb_val) == T_STRING) {
+        case _C_PTR:
+            // Inspired from the Guile interface. Same as char_ptr above
+            if (TYPE(rb_val) == T_STRING) {
             
-      NSMutableData	*d;
-      char		*s;
-      int		l;
+                NSMutableData	*d;
+                char		*s;
+                int		l;
             
-      s = STR2CSTR(rb_val);
-      l = strlen(s);
-      d = [NSMutableData dataWithBytesNoCopy: s length: l];
-      *(void**)data = (void*)[d mutableBytes];
+                s = STR2CSTR(rb_val);
+                l = strlen(s);
+                d = [NSMutableData dataWithBytesNoCopy: s length: l];
+                *(void**)where = (void*)[d mutableBytes];
             
-    } else if (TYPE(rb_val) == T_DATA) {
-      // I guess this is the right thing to do. Pass the
-      // embedded ObjC as a blob
-      Data_Get_Struct(rb_val,void* ,*(void**)data);
-    } else {
-      ret = NO;
-    }
-    break;
+            } else if (TYPE(rb_val) == T_DATA) {
+                // I guess this is the right thing to do. Pass the
+                // embedded ObjC as a blob
+                Data_Get_Struct(rb_val,void* ,*(void**)where);
+            } else {
+                ret = NO;
+            }
+            break;
 
 
-  case _C_STRUCT_B:
-    ret = NO;
-    break;
+        case _C_STRUCT_B: 
+          {
+            // We are attacking a new embedded structure in a structure
+            
+            // For the time being we just accept Ruby Array as input to
+            // a C structure
+            if (TYPE(rb_val) == T_ARRAY) {
+              
+                if ( rb_objc_convert_to_objc(rb_val, where, 0, type) == NO) {     
+                    // if something went wrong in the conversion just return Qnil
+                    rb_val = Qnil;
+                    ret = NO;
+                }
+     
+            } else {
+                ret = NO;
+            }
+          }
+          
+            break;
 
 
-  default:
-    ret =NO;
-    break; 
-  }
-    
+        default:
+            ret =NO;
+            break; 
+        }
+
+        // skip the component we have just processed
+        type = objc_skip_typespec(type);
+
+    } while (inStruct && *type != _C_STRUCT_E);
   
-  if (ret == NO) {
-    /* raise exception - Don't know how to handle this type of argument */
-    msg = [NSString stringWithFormat: @"Don't know how to convert Ruby type 0x%02xin ObjC type '%c'", TYPE(rb_val), *type];
-    NSDebugLog(msg);
-    rb_raise(rb_eTypeError, [msg cString]);
-  }
+    if (ret == NO) {
+        /* raise exception - Don't know how to handle this type of argument */
+        msg = [NSString stringWithFormat: @"Don't know how to convert Ruby type 0x%02x in ObjC type '%c'", TYPE(rb_thing), *type];
+        NSDebugLog(msg);
+        rb_raise(rb_eTypeError, [msg cString]);
+    }
 
-  return ret;
+    return ret;
   
 }
 
 
 BOOL
-rb_objc_convert_to_rb(void *data, const char *type, VALUE *rb_val_ptr)
+rb_objc_convert_to_rb(void *data, int offset, const char *type, VALUE *rb_val_ptr)
 {
     BOOL ret = YES;
     VALUE rb_class;
     double dbl_value;
     NSSelector *selObj;
+    BOOL inStruct = NO;
+    VALUE end = Qnil;
 
-    NSDebugLog(@"Converting ObjC value (location 0x%lx, type '%c') to Ruby",
-               *(id*)data, type[0]);
-    
-    switch (type[0])
-        {
-        case _C_ID: 
+
+    if (*type == _C_STRUCT_B) {
+
+        NSDebugLog(@"Starting conversion of ObjC structure %s to Ruby value", type);
+
+        inStruct = YES;
+        while (*type != _C_STRUCT_E && *type++ != '=');
+        if (*type == _C_STRUCT_E) {
+            // this is an empty structure !! Illegal... and we don't know
+            // what to return
+            *rb_val_ptr = Qundef;
+            return NO;
+        }
+    }
+
+
+  do {
+
+      VALUE    rb_val;
+      int	align = objc_alignof_type (type); /* pad to alignment */
+      void	*where;
+
+      NSDebugLog(@"Converting ObjC value (0x%lx) of type '%c' to Ruby value",
+                 *(id*)data, *type);
+
+      offset = ROUND(offset, align);
+      where = data + offset;
+      offset += objc_sizeof_type(type);
+
+      switch (*type)
           {
-            id val = *(id*)data;
+          case _C_ID: {
+              id val = *(id*)where;
 
-            // Check if the ObjC object is already wrapped into a Ruby object
-            // If so do not create a new object. Return the existing one
-            if ( (*rb_val_ptr = (VALUE)[[objectValue objectForKey:val] unsignedLongValue] ) )  
-            {
-                NSDebugLog(@"ObJC object already wrapped in an existing Ruby value (0x%lx)",*rb_val_ptr);
-                return YES;
-            }
-                 
+              // Check if the ObjC object is already wrapped into a Ruby object
+              // If so do not create a new object. Return the existing one
+              if ( (rb_val = (VALUE) NSMapGet(knownObjects,(void *)val)) )  {
+                      NSDebugLog(@"ObJC object already wrapped in an existing Ruby value (0x%lx)",rb_val);
 
-            if (val == nil) {
+              } else if (val == nil) {
+                  
+                  rb_val = Qnil;
+                  
+              } else if ( [val class] == [RIGSWrapObject class] ) {
+                  
+                  // This a native ruby object wrapped into an Objective C 
+                  // nutshell. Returns what's in the nutshell
+                  rb_val = [val getRubyObject];
+                  
+              } else if ( [val isKindOfClass: [NSString class]] &&
+                          ( IS_STRING_AUTOCONVERT_ON() ) ) {
+                  
+                  // FIXME: Not sure what to do with memory management here ??
+                  rb_val = rb_str_new2([val cString]);
+                  
+              } else if ([val isKindOfClass: [NSNumber class]] &&
+                         ( IS_NUMBER_AUTOCONVERT_ON() ) ) {
 
-              *rb_val_ptr = Qnil;
+                  // Convert the NSNumber to a Ruby number according
+                  // to its type
+                  const char *tmptype = [val objCType];
+                  int tmpsize = objc_sizeof_type(tmptype);
+                  struct dummy {  char val[tmpsize]; } block;
+
+                  [val getValue: (void *)&block];
               
-            } else if ( [val class] == [RIGSWrapObject class] ) {
-              
-              // This a native ruby object wrapped into an Objective C 
-              // nutshell. Returns what's in the nutshell
-              *rb_val_ptr = [val getRubyObject];
-              
-            } else if ( [val isKindOfClass: [NSString class]] &&
-                        ( IS_STRING_AUTOCONVERT_ON() ) ) {
-              
-              // FIXME: Not sure what to do with memory management here ??
-              *rb_val_ptr = rb_str_new2([val cString]);
-              
-            } else {
-              
-              // Retain the value otherwise GNUStep releases it and Ruby crashes
-              // It's Ruby's garbage collector job to indirectly release the ObjC 
-              // object by calling rb_objc_release() */
-              [val retain];
-              NSDebugLog(@"Class of arg transmitted to Ruby = %@",NSStringFromClass([val class]));             
-              rb_class = [ [classValue objectForKey:[val class]] unsignedLongValue];
-              
-              // if the class of the returned object is unknown to Ruby
-              // then register the new class with Ruby first
-              if (rb_class == (VALUE)nil) {
-                rb_class = rb_objc_register_class_from_objc([val class]);
+                  rb_objc_convert_to_rb(&block, 0, tmptype, &rb_val);
+                  
+              } else {
+                  
+                  // Retain the value otherwise GNUStep releases it and Ruby crashes
+                  // It's Ruby's garbage collector job to indirectly release the ObjC 
+                  // object by calling rb_objc_release() */
+                  if ([val respondsToSelector: @selector(retain)]) {
+                      [val retain];
+                  }
+                  
+                  NSDebugLog(@"Class of arg transmitted to Ruby = %@",NSStringFromClass([val class]));
+
+                  rb_class = (VALUE) NSMapGet(knownClasses, (void *)[val class]);
+                  
+                  // if the class of the returned object is unknown to Ruby
+                  // then register the new class with Ruby first
+                  if (rb_class == Qfalse) {
+                      rb_class = rb_objc_register_class_from_objc([val class]);
+                  }
+                  rb_val = Data_Wrap_Struct(rb_class,0,rb_objc_release,val);
               }
-              *rb_val_ptr = Data_Wrap_Struct(rb_class,0,rb_objc_release,val);
-            }
           }
           break;
 
         case _C_CHARPTR: 
           {
             // Convert char * to ruby String
-            char *val = *(char **)data;
+            char *val = *(char **)where;
             if (val)
-              *rb_val_ptr = rb_str_new2(val);
+              rb_val = rb_str_new2(val);
             else 
-              *rb_val_ptr = Qnil;
+              rb_val = Qnil;
           }
           break;
 
         case _C_PTR:
           {
-            // FIXME??: Don't know what how to convert a void * to Ruby 
-            *rb_val_ptr = Qnil;
-            NSLog(@"Don't know how to convert void * (_C_PTR) to ruby (0x%lx)",*(void**)data);
-            ret = NO;
+            // A void * pointer is simply returned as its integer value
+            rb_val = UINT2NUM((unsigned int) where);
           }
           break;
 
         case _C_CHR:
-          *rb_val_ptr = CHR2FIX(*(unsigned char *)data);
+          rb_val = CHR2FIX(*(unsigned char *)where);
             break;
 
         case _C_UCHR:
             // Assume that if YES or NO then it's a BOOLean
-            if ( *(unsigned char *)data == YES) 
-                *rb_val_ptr = Qtrue;
-            else if ( *(unsigned char *)data == NO)
-                *rb_val_ptr = Qfalse;
+            if ( *(unsigned char *)where == YES) 
+                rb_val = Qtrue;
+            else if ( *(unsigned char *)where == NO)
+                rb_val = Qfalse;
             else
-                *rb_val_ptr = CHR2FIX(*(unsigned char *)data);
+                rb_val = CHR2FIX(*(unsigned char *)where);
             break;
 
         case _C_SHT:
-            *rb_val_ptr = INT2FIX((int) (*(short *) data));
+            rb_val = INT2FIX((int) (*(short *) where));
             break;
 
         case _C_USHT:
-            *rb_val_ptr = INT2FIX((int) (*(unsigned short *) data));
+            rb_val = INT2FIX((int) (*(unsigned short *) where));
             break;
 
         case _C_INT:
-            *rb_val_ptr = INT2FIX(*(int *)data);
+            rb_val = INT2FIX(*(int *)where);
             break;
 
         case _C_UINT:
-            *rb_val_ptr = INT2FIX(*(unsigned int*)data);
+            rb_val = INT2FIX(*(unsigned int*)where);
             break;
 
         case _C_LNG:
-            *rb_val_ptr = INT2NUM(*(long*)data);
+            rb_val = INT2NUM(*(long*)where);
             break;
 
         case _C_ULNG:
-            *rb_val_ptr = INT2FIX(*(unsigned long*)data);
+            rb_val = INT2FIX(*(unsigned long*)where);
             break;
 
         case _C_FLT:
@@ -546,89 +670,139 @@ rb_objc_convert_to_rb(void *data, const char *type, VALUE *rb_val_ptr)
             // This one doesn't crash but returns a bad floating point
             // value to Ruby. val doesn not contain the expected float
             // value. why???
-            NSDebugLog(@"ObjC val for float = %f", *(float*)data);
+            NSDebugLog(@"ObjC val for float = %f", *(float*)where);
             
-            dbl_value = (double) (*(float*)data);
+            dbl_value = (double) (*(float*)where);
             NSDebugLog(@"Double ObjC value returned = %lf",dbl_value);
-            *rb_val_ptr = rb_float_new(dbl_value);
+            rb_val = rb_float_new(dbl_value);
           }
           break;
 
         case _C_DBL:
-            NSDebugLog(@"Double float Value returned = %lf",*(double*)data);
-             *rb_val_ptr = rb_float_new(*(double*)data);
+            NSDebugLog(@"Double float Value returned = %lf",*(double*)where);
+             rb_val = rb_float_new(*(double*)where);
             break;
 
 
         case _C_CLASS:
           {
-            Class val = *(Class*)data;
+            Class val = *(Class*)where;
             
             NSDebugLog(@"ObjC Class = 0x%lx", val);
-            rb_class = [ [classValue objectForKey:val] unsignedLongValue];
+            rb_class = (VALUE) NSMapGet(knownClasses, (void *)val);
+
             // if the Class is unknown to Ruby then register it 
             // in Ruby in return the corresponding Ruby class VALUE
-            if (rb_class == (VALUE)nil) {
+            if (rb_class == Qfalse) {
                 rb_class = rb_objc_register_class_from_objc(val);
             }
-            *rb_val_ptr = rb_class;
+            rb_val = rb_class;
           }
           break;
           
         case _C_SEL: 
           {
-            SEL val = *(SEL*)data;
+            SEL val = *(SEL*)where;
             
             NSDebugLog(@"ObjC Selector = 0x%lx", val);
             // ObjC selectors can either be returned as Ruby String
             // or as instance of class NSSelector
             if (IS_SELECTOR_AUTOCONVERT_ON()) {
               
-              *rb_val_ptr = rb_str_new2([NSStringFromSelector(val) cString]);
+              rb_val = rb_str_new2([NSStringFromSelector(val) cString]);
               
             } else {
               
-              // Before instantiating NSSelector make sure it is known to
-              // Ruby
-              rb_class = [ [classValue objectForKey:[NSSelector class]] unsignedLongValue];
-              if (rb_class == (VALUE)nil) {
-                rb_class = rb_objc_register_class_from_objc([NSSelector class]);
-              }
-              selObj = [[NSSelector selectorWithSEL: (SEL)val] retain];
-              *rb_val_ptr = Data_Wrap_Struct(rb_class,0,rb_objc_release,selObj);
+                // Before instantiating NSSelector make sure it is known to
+                // Ruby
+                rb_class = (VALUE) NSMapGet(knownClasses, (void *)[NSSelector class]);
+
+                if (rb_class == Qfalse) {
+                    rb_class = rb_objc_register_class_from_objc([NSSelector class]);
+                }
+                selObj = [[NSSelector selectorWithSEL: (SEL)val] retain];
+                rb_val = Data_Wrap_Struct(rb_class,0,rb_objc_release,selObj);
             }
           }
           break;
 
+          case _C_STRUCT_B: 
+            {
+
+              // We are attacking a new embedded structure in a structure
+            
+          
+            if ( rb_objc_convert_to_rb(where, 0, type, &rb_val) == NO) {     
+                // if something went wrong in the conversion just return Qnil
+                rb_val = Qnil;
+                ret = NO;
+            } 
+            }
+            
+            break; 
+
         default:
-            NSLog(@"Don't know how to convert ObjC type '%c' to Ruby VALUE",type[0]);
-            *rb_val_ptr = Qnil;
+            NSLog(@"Don't know how to convert ObjC type '%c' to Ruby VALUE",*type);
+            rb_val = Qnil;
             ret = NO;
             
             break;
         }
-      
-    NSDebugLog(@"End of ObjC conversion to Ruby");
+
+      if (inStruct) {
+
+          // We are in a C structure 
+
+          if (end == Qnil) {
+              // first time in there so allocate a new Ruby array
+              end = rb_ary_new();
+              rb_ary_push(end, rb_val);
+              *rb_val_ptr = end;
+              
+          } else {
+              // Next component in the same structure. Append it to 
+              // the end of the running Ruby array
+              rb_ary_push(end, rb_val);
+          }
+
+
+      } else {
+          // We are not in a C structure so simply return the
+          // Ruby value
+          *rb_val_ptr = rb_val;
+      }
+     
+      // skip the type of the component we have just processed
+      type = (char*)objc_skip_typespec(type);
+
+ 
+ 
+  } while (inStruct && *type != _C_STRUCT_E);
+
+  NSDebugLog(@"End of ObjC to Ruby conversion");
     
-    return ret;
+  return ret;
 
 }
 
 
 VALUE
-rb_objc_send(char *method, int argc, VALUE *argv, VALUE self)
+rb_objc_send(char *method, int rb_argc, VALUE *rb_argv, VALUE rb_self)
 {
     SEL sel;
     id pool = [[NSAutoreleasePool alloc] init];
 
-  NSDebugLog(@"<<<< Invoking method %s with %d argument(s) on Ruby VALUE 0x%lx (Objc id 0x%lx)",method, argc, self);
-  sel = SelectorFromRubyName(method, argc > 0);
-  [pool release];
+    NSDebugLog(@"<<<< Invoking method %s with %d argument(s) on Ruby VALUE 0x%lx (Objc id 0x%lx)",method, rb_argc, rb_self);
 
-  return rb_objc_send_with_selector(sel, argc, argv, self);
+    sel = SelectorFromRubyName(method, rb_argc > 0);
+    [pool release];
+
+    return rb_objc_send_with_selector(sel, rb_argc, rb_argv, rb_self);
 }
 
-VALUE rb_objc_send_with_selector(SEL sel, int argc, VALUE *argv, VALUE self)
+
+VALUE
+rb_objc_send_with_selector(SEL sel, int rb_argc, VALUE *rb_argv, VALUE rb_self)
 {
     id pool = [NSAutoreleasePool new];
     id rcv;
@@ -642,25 +816,25 @@ VALUE rb_objc_send_with_selector(SEL sel, int argc, VALUE *argv, VALUE self)
     BOOL okydoky;
         
         
-    /* determine the receiver type - Class or instance */
-    switch (TYPE(self)) {
+    /* determine the receiver type - Class or instance ? */
+    switch (TYPE(rb_self)) {
 
     case T_DATA:
-        NSDebugLog(@"Self Ruby value is 0x%lx (ObjC is at 0x%lx)",self,DATA_PTR(self));
+        NSDebugLog(@"Self Ruby value is 0x%lx (ObjC is at 0x%lx)",rb_self,DATA_PTR(rb_self));
         
-        Data_Get_Struct(self,id,rcv);
+        Data_Get_Struct(rb_self,id,rcv);
         
         NSDebugLog(@"Self is an object of Class %@ (description is '%@')",NSStringFromClass([rcv class]),rcv);
       break;
 
     case T_CLASS:
-        rcv = (id) NUM2UINT(rb_iv_get(self, "@objc_class"));
-        NSDebugLog(@"Self is of class: %@", NSStringFromClass(rcv));
+        rcv = (id) NUM2UINT(rb_iv_get(rb_self, "@objc_class"));
+        NSDebugLog(@"Self is Class: %@", NSStringFromClass(rcv));
       break;
 
     default:
       /* raise exception */
-      NSDebugLog(@"Don't know how to handle self Ruby object of type 0x%02x",TYPE(self));
+      NSDebugLog(@"Don't know how to handle self Ruby object of type 0x%02x",TYPE(rb_self));
       rb_raise(rb_eTypeError, "not valid self value");
       return Qnil;
       break;
@@ -681,8 +855,8 @@ VALUE rb_objc_send_with_selector(SEL sel, int argc, VALUE *argv, VALUE self)
 
     // Check that we have the right number of arguments
     nbArgs = [signature numberOfArguments];
-    if ( nbArgs != argc+2) {
-        rb_raise(rb_eArgError, "wrong number of arguments (%d for %d)",argc, nbArgs-2);
+    if ( nbArgs != rb_argc+2) {
+        rb_raise(rb_eArgError, "wrong number of arguments (%d for %d)",rb_argc, nbArgs-2);
         return Qnil;
     }
     
@@ -705,7 +879,7 @@ VALUE rb_objc_send_with_selector(SEL sel, int argc, VALUE *argv, VALUE self)
 #endif
         data = alloca(objc_sizeof_type(type));
                         
-        okydoky = rb_objc_convert_to_objc(argv[i-2], data, type);
+        okydoky = rb_objc_convert_to_objc(rb_argv[i-2], data, 0, type);
         [invocation setArgument: data atIndex: i];
     }
  
@@ -715,7 +889,7 @@ VALUE rb_objc_send_with_selector(SEL sel, int argc, VALUE *argv, VALUE self)
     // Examine the return value now and pass it by to Ruby
     // after conversion
     if([signature methodReturnLength]) {
-
+      
         type = [signature methodReturnType];
             
         NSDebugLog(@"Return Length = %d", [[invocation methodSignature] methodReturnLength]);
@@ -728,7 +902,7 @@ VALUE rb_objc_send_with_selector(SEL sel, int argc, VALUE *argv, VALUE self)
         // (e.g. double on 32 bits architecture)
         NSDebugLog(@"ObjC return value = 0x%lx",data);
 
-        okydoky = rb_objc_convert_to_rb(data, type, &rb_retval);
+        okydoky = rb_objc_convert_to_rb(data, 0, type, &rb_retval);
 
     } else {
         // This is a method with no return value (void). Must return something
@@ -745,20 +919,20 @@ VALUE rb_objc_send_with_selector(SEL sel, int argc, VALUE *argv, VALUE self)
 }
 
 VALUE 
-rb_objc_handler(int argc, VALUE *argv, VALUE self)
+rb_objc_handler(int rb_argc, VALUE *rb_argv, VALUE rb_self)
 {    
-	return rb_objc_send(rb_id2name(rb_frame_last_func()), argc, argv, self);
+	return rb_objc_send(rb_id2name(rb_frame_last_func()), rb_argc, rb_argv, rb_self);
 }
 
 VALUE 
-rb_objc_to_s_handler(VALUE self)
+rb_objc_to_s_handler(VALUE rb_self)
 {
     id pool = [NSAutoreleasePool new];
     id rcv;
     VALUE rb_desc;
 
     // Invoke ObjC description method and always return a Ruby string
-    Data_Get_Struct(self,id,rcv);
+    Data_Get_Struct(rb_self,id,rcv);
     rb_desc = rb_str_new2([[rcv description] cString]);
  
     [pool release];
@@ -767,11 +941,11 @@ rb_objc_to_s_handler(VALUE self)
 }
 
 VALUE
-rb_objc_invoke(int argc, VALUE *argv, VALUE self)
+rb_objc_invoke(int rb_argc, VALUE *rb_argv, VALUE rb_self)
 {
-	char *method = rb_id2name(SYM2ID(argv[0]));
+	char *method = rb_id2name(SYM2ID(rb_argv[0]));
  
-	return rb_objc_send(method, argc-1, argv+1, self);
+	return rb_objc_send(method, rb_argc-1, rb_argv+1, rb_self);
 }
 
 NSArray* 
@@ -838,7 +1012,7 @@ method_selectors_for_class(Class class, BOOL use_super)
   return [methodSet allObjects];
 }
 
-int rb_objc_register_instance_methods(Class objc_class, VALUE ruby_class)
+int rb_objc_register_instance_methods(Class objc_class, VALUE rb_class)
 {
     NSArray *allMthSels;
     NSEnumerator *mthEnum;
@@ -847,7 +1021,7 @@ int rb_objc_register_instance_methods(Class objc_class, VALUE ruby_class)
     int imth_cnt = 0;
 
     //Store the ObjcC Class id in the @@objc_class Ruby Class Variable
-    rb_iv_set(ruby_class, "@objc_class", INT2NUM((int)objc_class));
+    rb_iv_set(rb_class, "@objc_class", INT2NUM((int)objc_class));
     
     /* Define all Ruby Instance methods for this Class */
     allMthSels = method_selectors_for_class(objc_class, NO);
@@ -858,19 +1032,19 @@ int rb_objc_register_instance_methods(Class objc_class, VALUE ruby_class)
         mthRubyName = RubyNameFromSelectorString(mthSel);
         //NSDebugLog(@"Registering Objc method %@ under Ruby name %@)", mthSel,mthRubyName);
 
-        rb_define_method(ruby_class, [mthRubyName cString], rb_objc_handler, -1);
+        rb_define_method(rb_class, [mthRubyName cString], rb_objc_handler, -1);
         imth_cnt++;
     }
 
     // map ObjC object description method to Ruby to_s
     // Ideally it should be a new method calling description and returning
-    //rb_define_alias(ruby_class, "to_s", "description");
-    rb_define_method(ruby_class, "to_s", rb_objc_to_s_handler,0);
+    //rb_define_alias(rb_class, "to_s", "description");
+    rb_define_method(rb_class, "to_s", rb_objc_to_s_handler,0);
     return imth_cnt;
     
 }
 
-int rb_objc_register_class_methods(Class objc_class, VALUE ruby_class)
+int rb_objc_register_class_methods(Class objc_class, VALUE rb_class)
 {
     NSArray *allMthSels;
     NSEnumerator *mthEnum;
@@ -890,13 +1064,13 @@ int rb_objc_register_class_methods(Class objc_class, VALUE ruby_class)
         mthRubyName = RubyNameFromSelectorString(mthSel);
         //NSDebugLog(@"Registering Objc class method %@ under Ruby name %@)", mthSel,mthRubyName);
 
-        rb_define_singleton_method(ruby_class, [mthRubyName cString], rb_objc_handler, -1);
+        rb_define_singleton_method(rb_class, [mthRubyName cString], rb_objc_handler, -1);
         cmth_cnt++;
      }
 
     // Redefine the new method to point to our special rb_objc_new function
-    rb_undef_method(CLASS_OF(ruby_class),"new");
-    rb_define_singleton_method(ruby_class, "new", rb_objc_new, -1);
+    rb_undef_method(CLASS_OF(rb_class),"new");
+    rb_define_singleton_method(rb_class, "new", rb_objc_new, -1);
 
     return cmth_cnt;
 }
@@ -910,9 +1084,9 @@ rb_objc_register_class_from_objc (Class objc_class)
     const char *cname = [NSStringFromClass(objc_class) cString];
 
     Class objc_super_class = [objc_class superclass];
-    VALUE ruby_class;
-    VALUE ruby_super_class = Qnil;
-    NSNumber *ruby_class_value;
+    VALUE rb_class;
+    VALUE rb_super_class = Qnil;
+    //    NSNumber *rb_class_value;
     int imth_cnt;
     int cmth_cnt;
 
@@ -920,35 +1094,40 @@ rb_objc_register_class_from_objc (Class objc_class)
 
     // If this class has already been registered then return existing
     // Ruby class VALUE
-    ruby_class_value = [classValue objectForKey:objc_class];
-    if (ruby_class_value != nil) {
-       NSDebugLog(@"Class %s already registered (VALUE 0x%lx)",
-             cname,[ruby_class_value unsignedLongValue]);
-       return [ruby_class_value unsignedLongValue];
+    rb_class = (VALUE) NSMapGet(knownClasses, (void *)objc_class);
+
+    if (rb_class) {
+       NSDebugLog(@"Class %s already registered (VALUE 0x%lx)", cname, rb_class);
+       return rb_class;
     }
 
     // If it is not the mother of all classes then create the
     // Ruby super class first
     if ((objc_class == [NSObject class]) || (objc_super_class == nil)) 
-        ruby_super_class = rb_cObject;
+        rb_super_class = rb_cObject;
     else
-        ruby_super_class = rb_objc_register_class_from_objc(objc_super_class);
+        rb_super_class = rb_objc_register_class_from_objc(objc_super_class);
 
-    ruby_class = rb_define_class_under(rb_mRigs, cname, ruby_super_class);
+    /* FIXME? A class name in Ruby must be constant and therefore start with
+          A-Z character. If this is not the case the following method call will work
+          ok but the Class name will not be explicitely accessible from Ruby
+          (Rigs.import deals with Class with non Constant name to avoid NameError
+          exception */
+    rb_class = rb_define_class_under(rb_mRigs, cname, rb_super_class);
 
-    cmth_cnt = rb_objc_register_class_methods(objc_class, ruby_class);
-    imth_cnt = rb_objc_register_instance_methods(objc_class, ruby_class);
+    cmth_cnt = rb_objc_register_class_methods(objc_class, rb_class);
+    imth_cnt = rb_objc_register_instance_methods(objc_class, rb_class);
 
     NSDebugLog(@"%d instance and %d class methods defined for class %s",imth_cnt,cmth_cnt,cname);
 
     // Remember that this class is now defined in Ruby
-    ruby_class_value = [NSNumber numberWithUnsignedLong:ruby_class];  
-    [classValue setObject:ruby_class_value forKey:objc_class];
-    NSDebugLog(@"VALUE for new Ruby Class %s = 0x%lx",cname,ruby_class);
+    NSMapInsertKnownAbsent(knownClasses, (void*)objc_class, (void*)rb_class);
+    
+    NSDebugLog(@"VALUE for new Ruby Class %s = 0x%lx",cname,rb_class);
 
     // Execute Post registration code if it exists
     if ( [objc_class respondsToSelector: @selector(finishRegistrationOfRubyClass:)] ) {
-      [objc_class finishRegistrationOfRubyClass: ruby_class];
+      [objc_class finishRegistrationOfRubyClass: rb_class];
     } else {
       NSDebugLog(@"Class %@ doesn't respond to finish registration method",NSStringFromClass(objc_class));
     } 
@@ -965,26 +1144,26 @@ rb_objc_register_class_from_objc (Class objc_class)
     // Define a top level Ruby constant  with the same name as the class name
     // No don't do that! Force user to use Rigs#import on the Ruby side to
     // load any additional Ruby code if there is some
-    //rb_define_global_const(cname, ruby_class);
+    //rb_define_global_const(cname, rb_class);
 
     [pool release];
-    return ruby_class;
+    return rb_class;
 }
 
 VALUE
-rb_objc_register_class_from_ruby(VALUE self, VALUE name)
+rb_objc_register_class_from_ruby(VALUE rb_self, VALUE rb_name)
 {
     id pool = [[NSAutoreleasePool alloc] init];		
-    char *cname = STR2CSTR(name);
-    VALUE ruby_class = Qnil;
+    char *cname = STR2CSTR(rb_name);
+    VALUE rb_class = Qnil;
 
     Class objc_class = NSClassFromString([NSString stringWithCString: cname]);
     
     if(objc_class)
-        ruby_class = rb_objc_register_class_from_objc(objc_class);
+        rb_class = rb_objc_register_class_from_objc(objc_class);
 
     [pool release];
-    return ruby_class;
+    return rb_class;
 }
 
 VALUE
@@ -1009,7 +1188,7 @@ rb_objc_get_ruby_value_from_string(char * classname)
 void
 rb_objc_raise_exception(NSException *exception)
 {
-    VALUE ruby_rterror_class, rb_exception;
+    VALUE rb_rterror_class, rb_exception;
     
     NSDebugLog(@"Uncaught Objective C Exception raised !");
     NSDebugLog(@"Name:%@  / Reason:%@  /  UserInfo: ?",
@@ -1019,13 +1198,171 @@ rb_objc_raise_exception(NSException *exception)
     // exception class
     // Rk: the 1st line below  is the only way I have found to get access to
     // the VALUE of the RuntimeError class. Pretty ugly.... but it works.
-    //    ruby_rterror_class = rb_eval_string("RuntimeError.id") & ~FIXNUM_FLAG;
-    ruby_rterror_class = rb_objc_get_ruby_value_from_string("RuntimeError");
-    rb_exception = rb_define_class([[exception name] cString], ruby_rterror_class);
+    //    rb_rterror_class = rb_eval_string("RuntimeError.id") & ~FIXNUM_FLAG;
+    rb_rterror_class = rb_objc_get_ruby_value_from_string("RuntimeError");
+    rb_exception = rb_define_class([[exception name] cString], rb_rterror_class);
     rb_raise(rb_exception, [[exception reason] cString]);
     
 }
 
+
+/* Rebuild the main Bundle with appropriate Tool/Application path
+   Calling NSBundle +initialize (again) doesn't work because the 
+   _executable_path internal variable is taken from the proc fs
+   filesystem which always says /usr/local/bin/ruby
+   And NSBundle mainBundle relies on _executable_path so... we are stuck
+   and we need to run this ugly code to patch the main Bundle
+*/
+void _rb_objc_rebuild_main_bundle()
+{
+    NSString *path, *s;
+    NSBundle *b;
+    id pool = [NSAutoreleasePool new];		
+
+      
+    // Get access to the current main bundle
+    b = [NSBundle mainBundle];
+    NSDebugLog(@"Current Main Bundle path: %@", [b bundlePath]);
+
+    // Rebuild the real path to Ruby Tool/Application
+    path = [[[NSProcessInfo processInfo] arguments] objectAtIndex: 0];
+    path = [NSBundle _absolutePathOfExecutable: path];
+    path = [path stringByDeletingLastPathComponent];
+
+    // For some reason _library_combo, _gnustep_target_* methods are not
+    // visible (why?) so simply strip the 3 path components assuming they are
+    // here (FIXME?)
+    s = [path lastPathComponent];
+    //if ([s isEqual: [NSBundle _library_combo]])
+    path = [path stringByDeletingLastPathComponent];
+    /* target os */
+    s = [path lastPathComponent];
+    //if ([s isEqual: [NSBundle _gnustep_target_os]])
+    path = [path stringByDeletingLastPathComponent];
+    /* target cpu */
+    s = [path lastPathComponent];
+    //if ([s isEqual: [NSBundle _gnustep_target_cpu]])
+    path = [path stringByDeletingLastPathComponent];
+    /* object dir */
+    s = [path lastPathComponent];
+    if ([s hasSuffix: @"_obj"])
+	path = [path stringByDeletingLastPathComponent];
+
+    NSDebugLog(@"New generated path to application: %@", path);
+      
+    /* patch the main Bundle path */
+    [b initWithPath:path];
+
+    [pool release];		
+
+}
+
+
+/* Rebuild ObjC argc and argv from the Ruby context */
+void
+_rb_objc_rebuild_argc_argv(VALUE rb_argc, VALUE rb_argv)
+{
+    int i;
+
+    // +1 in arcg for the script name that is not in ARGV in Ruby
+    ourargc = FIX2INT(rb_argc)+1;
+    
+    ourargv = malloc(sizeof(char *) * ourargc);
+    ourargv[0] = STR2CSTR(rb_gv_get("$0"));
+
+    NSDebugLog(@"Argc=%d\n",ourargc);
+    NSDebugLog(@"Argv[0]=%s\n",ourargv[0]);
+     
+    for (i=1;i<ourargc; i++) {
+        ourargv[i] = STR2CSTR(rb_ary_entry(rb_argv,(long)(i-1)));     
+        NSDebugLog(@"Argv[%d]=%s\n",i,ourargv[i]);
+    }
+    
+}
+
+
+/*  Now try and ask process info. If an exception is raised then it means
+    we are on a platform where NSProcessInfo +initializeWithArguments
+    was not automaitcally called at run time. In this case we must call it
+    ourself.
+    If it doesn't raise an exception then we need to patch the main Bundle
+    to reflect the real location of the Tool/Application otherwise it simply
+    says /usr/loca/bin (where Ruby) is and none of the Tool/Application
+    resources are visible
+
+    The goal of this function is twofold:
+
+    1) Update the NSProcessInfo information with real argc, argv and env
+        (argv needs to be modified so that argv[0] reflects the ruby script
+        path as a process name instead of simply "ruby"
+
+    2) Modify the Main NSBundle to reflect the ruby script executable path of
+        because otherwise the executable path always says /usr/local/bin/ruby
+        and NSBundle never finds the application Resources (plist files, etc...)
+*/
+void _rb_objc_initialize_process_context(VALUE rb_argc, VALUE rb_argv)
+{
+    NSProcessInfo *pi = nil;
+    BOOL properProcessInitDone = NO;
+    id pool = [NSAutoreleasePool new];		
+        
+    
+    // rebuild our own argc and argv from what Ruby gives us
+    _rb_objc_rebuild_argc_argv(rb_argc, rb_argv);
+
+    // Now see if process info has already been properly initialized
+    // NSInternalInconsistencyException raised if not
+    NS_DURING
+
+      pi = [NSProcessInfo processInfo];
+    
+    NS_HANDLER
+
+      [NSProcessInfo initializeWithArguments:ourargv
+                                        count:ourargc
+                                  environment:environ];
+       pi = [NSProcessInfo processInfo];
+       properProcessInitDone = YES;
+    
+    NS_ENDHANDLER
+
+    // Process Info still null ? It shouldn't...
+    if (pi == nil) {
+        [NSException raise:NSInternalInconsistencyException
+                     format:@"Process Info still un-initialized !!"];
+    }
+
+    NSDebugLog(@"Arguments in NSProcessInfo before rebuild: %@",[[NSProcessInfo processInfo] arguments]);
+    
+    // At this point we do have a properly initialize processInfo structure
+    // so now patch the mainBundle to reflect the real location of the Ruby
+    // tool/Application
+    if (!properProcessInitDone) {
+             
+      extern void _gnu_process_args(int argc, char *argv[], char *env[]);
+
+      /* Patch GNUstep Processinfo structure to take into account the 
+              the debug flag given on the command line (--GNU-Debug=dflt)
+              We cannot use NSProcessInfo initializeWithArguments: because it
+              was called at the very beginning by the NSProcessInfo +load method
+              and calling it a second time has no effect (See NSApplication.m)
+              FIXME?? : the only work around I have found is to call the internal
+              function _gnu_process_args again */
+
+      _gnu_process_args(ourargc,ourargv,environ);
+ 
+    }
+
+    // In any case patch the main Bundle
+    _rb_objc_rebuild_main_bundle();
+
+    NSDebugLog(@"Arguments in NSProcessInfo after rebuild: %@",[[NSProcessInfo processInfo] arguments]);
+    
+    NSDebugLog(@"New Main Bundle path: %@", [[NSBundle mainBundle] bundlePath]);
+
+    [pool release];
+    
+}
 
 
 
@@ -1033,13 +1370,18 @@ rb_objc_raise_exception(NSException *exception)
 void
 Init_librigs()
 {
+    VALUE rb_argv, rb_argc;
 
     // Catch all GNUstep raised exceptions and direct them to Ruby
     NSSetUncaughtExceptionHandler(rb_objc_raise_exception);
 
-    // Initialize Object and Class hash tables
-    classValue = [NSMutableDictionary new];
-    objectValue = [NSMutableDictionary new];
+    // Initialize hash tables of known Objects and Classes
+    knownClasses = NSCreateMapTable(NSNonOwnedPointerMapKeyCallBacks,
+                                    NSNonOwnedPointerMapValueCallBacks,
+                                    0);
+    knownObjects = NSCreateMapTable(NSNonOwnedPointerMapKeyCallBacks,
+                                    NSNonOwnedPointerMapValueCallBacks,
+                                    0);
     
     // Create 2 ruby class methods under the ObjC Ruby module
     // - Rigs.class("className") : registers ObjC class with Ruby
@@ -1054,11 +1396,17 @@ Init_librigs()
               systematically converted to NSString and vice-versa.
            - SELECTOR_AUTOCONVERT: determine whether Ruby Strings are
               systematically converted to Selector when ObjC expects a selector
-             and vice-versa when a selector is returned to ruby    */
-    rb_global_variable(&stringAutoConvert);
+              and vice-versa when a selector is returned to ruby
+           - NUMBER_AUTOCONVERT: determine whether Ruby numbers are
+             systematically converted to NSNumber when ObjC expects a NSNumber
+             and vice-versa when a NSNumber is returned to ruby 
+       */
     rb_define_variable("$STRING_AUTOCONVERT", &stringAutoConvert);
-    rb_global_variable(&selectorAutoConvert);
+    rb_global_variable(&stringAutoConvert);
     rb_define_variable("$SELECTOR_AUTOCONVERT", &selectorAutoConvert);
+    rb_global_variable(&selectorAutoConvert);
+    rb_define_variable("$NUMBER_AUTOCONVERT", &numberAutoConvert);
+    rb_global_variable(&numberAutoConvert);
 
     // Define Rigs::VERSION in Ruby
     rb_define_const(rb_mRigs, "VERSION", rb_str_new2(rigsVersion));
@@ -1066,7 +1414,14 @@ Init_librigs()
     // Define the NSNotFound enum constant that is used all over the place
     // as a return value by Objective C methods
     rb_define_global_const("NSNotFound", INT2FIX((int)NSNotFound));
+    
+    // Initialize Process Info and Main Bundle
+    rb_argv = rb_gv_get("$*");
+    rb_argc = INT2FIX(RARRAY(rb_argv)->len);
 
+    _rb_objc_initialize_process_context(rb_argc, rb_argv);
+
+    
 }
 
 /* In case the library is compile with debug=yes */
