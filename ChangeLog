@@ -1,3 +1,87 @@
+2001-10-12 14:10  ljulliar
+
+	* GNUmakefile, Source/GNUmakefile: Version 0.2.1
+
+2001-10-08 12:05  ljulliar
+
+	* Source/: RIGSCore.m, RIGSProxySetup.m, RIGSSelectorMapping.h,
+	RIGSSelectorMapping.m: Ruby to ObjC selector mapping now works when
+	ObjC methods use unnamed arguments in the selector (fix from Tom
+	White)
+
+2001-10-06 22:31  ljulliar
+
+	* Source/RIGSCore.m: Do not change process context (Main Bundle
+	Path) if top level program is not ruby
+
+2001-10-04 16:51  ljulliar
+
+	* Source/: RIGSCore.m, RIGSNSApplication.m, RIGSProxySetup.m,
+	RIGSWrapObject.m: Code cleanup on memory management (use RETAIN,
+	DESTROY,... as advised in GNUstep conding convention)
+
+2001-10-01 18:10  ljulliar
+
+	* Source/RIGSCore.m: Now using Ruby CStruct class to pass Objective
+	C structures
+
+2001-10-01 18:08  ljulliar
+
+	* Examples/Gui/: CurrencyConverter/CurrencyConverter.rb,
+	FirstApp/FirstApp.rb: Old rsize NSRect method now called size
+	thanks to CStruct class
+
+2001-10-01 15:42  ljulliar
+
+	* Ruby/rigs/: NSPoint.rb, NSRange.rb, NSRect.rb, NSSize.rb:
+	Re-written to use the new CStruct class instead of plain Array
+
+2001-10-01 15:40  ljulliar
+
+	* Ruby/rigs/NSSelector.rb: NSString required
+
+2001-10-01 15:37  ljulliar
+
+	* Ruby/rigs/CStruct.rb: Ruby class to handle Obj C structure
+
+2001-10-01 13:01  ljulliar
+
+	* Examples/Gui/CurrencyConverter/: CurrencyConverter.rb,
+	CurrencyConverterIcon.tiff, CurrencyConverterInfo.plist,
+	GNUmakefile, GNUmakefile.postamble, fake.m: Currency Converter App
+	added as another GUI example
+
+2001-10-01 12:57  ljulliar
+
+	* Examples/Gui/CurrencyConverter/.cvsignore,
+	Examples/Gui/FirstApp/.cvsignore, Source/.cvsignore: Ignore test
+	output files (*.app, *obj,...)
+
+2001-10-01 12:47  ljulliar
+
+	* Testing/: Base/.cvsignore, Gui/.cvsignore: Ignore test output
+	files
+
+2001-09-28 15:54  ljulliar
+
+	* Ruby/rigs/NSRect.rb: NSRect.new without arg defaults to 0
+
+2001-09-28 15:26  ljulliar
+
+	* Ruby/AppKit.rb: GSHbox,Vbox,Table  added to the Appkit classes
+
+2001-09-26 17:47  ljulliar
+
+	* Source/RIGSCore.m: NSBundle.h included and new e-mail in header
+
+2001-09-24 15:29  ljulliar
+
+	* NEWS: Last minute changes for 0.2.0
+
+2001-09-24 15:19  ljulliar
+
+	* ChangeLog: Updated fro version 0.2.0
+
 2001-09-24 13:48  ljulliar
 
 	* Source/ObjcRuntimeUtilities.m: New version from Nicola Pero

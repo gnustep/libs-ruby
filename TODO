@@ -23,6 +23,16 @@ NSArray above)
 - Modify GNUmakefiles to make RIGS compilable on platforms where only
 GNUstep Base library is available (e.g. Windows)
 
+- Work on using Ruby scripting from GNUstep/Objective C. Already works
+partially but...
+
+  . When an ObjC class imported in Ruby is extended on the Ruby side
+  there must be a mechanism to make them visible in the ObjC runtime
+  as well
+
+  . When a new Ruby class inherits from an ObjC class then the new
+  subclass must also be made visible in the ObjC runtime
+
 
 DONE
 ====
