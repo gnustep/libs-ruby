@@ -93,6 +93,6 @@ int _RIGS_ruby_method_arity(const char *rb_class_name, const char *rb_mth_name);
 id  _RIGS_register_ruby_class (VALUE rb_class);
 VALUE _RIGS_register_ruby_class_from_ruby (VALUE self, VALUE rb_class);
 BOOL _RIGS_build_objc_types(VALUE rb_class, const char *rb_mth_name,
-			    int nbArgs, char *sigBuf);
+			    const char retValueType, int nbArgs, char *sigBuf);
 
 #endif /*__RIGSProxySetup_h_GNUSTEP_RUBY_INCLUDE*/

@@ -34,29 +34,37 @@
 #include "ruby.h"
 #undef _
 
+char **ourargv;
+int ourargc;
+
 void  rb_objc_release(id objc_object);
-void  rb_objc_mark(VALUE ruby_object);
-VALUE rb_objc_new(int argc, VALUE *argv, VALUE class);
+void  rb_objc_mark(VALUE rb_object);
+VALUE rb_objc_new(int rb_argc, VALUE *rb_argv, VALUE rb_class);
 
-BOOL rb_objc_convert_to_objc(VALUE rb_val, void *data, const char *type);
-BOOL rb_objc_convert_to_rb(void *data, const char *type, VALUE *rb_val);
+BOOL rb_objc_convert_to_objc(VALUE rb_val, void *data, int offset, const char *type);
+BOOL rb_objc_convert_to_rb(void *data, int offset, const char *type, VALUE *rb_val_ptr);
 
-VALUE rb_objc_send(char *method, int argc, VALUE *argv, VALUE self);
-VALUE rb_objc_send_with_selector(SEL sel, int argc, VALUE *argv, VALUE self);
-VALUE rb_objc_handler(int argc, VALUE *argv, VALUE self);
-VALUE rb_objc_invoke(int argc, VALUE *argv, VALUE self);
+VALUE rb_objc_send(char *method, int rb_argc, VALUE *rb_argv, VALUE rb_self);
+VALUE rb_objc_send_with_selector(SEL sel, int rb_argc, VALUE *rb_argv, VALUE rb_self);
+VALUE rb_objc_handler(int rb_argc, VALUE *rb_argv, VALUE rb_self);
+VALUE rb_objc_invoke(int rb_argc, VALUE *rb_argv, VALUE rb_self);
 
 NSArray* class_method_selectors_for_class(Class class, BOOL use_super);
 NSArray* instance_method_selectors_for_class(Class class, BOOL use_super);
 NSArray* method_selectors_for_class(Class class, BOOL use_super);
 
-int rb_objc_register_instance_methods(Class objc_class, VALUE ruby_class);
-int rb_objc_register_class_methods(Class objc_class, VALUE ruby_class);
+int rb_objc_register_instance_methods(Class objc_class, VALUE rb_class);
+int rb_objc_register_class_methods(Class objc_class, VALUE rb_class);
 VALUE rb_objc_register_class_from_objc (Class objc_class);
-VALUE rb_objc_register_class_from_ruby(VALUE self, VALUE name);
+VALUE rb_objc_register_class_from_ruby(VALUE rb_self, VALUE rb_name);
 VALUE rb_objc_get_ruby_value_from_string(char * classname);
 
 void rb_objc_raise_exception(NSException *exception);
+
+void _rb_objc_rebuild_main_bundle();
+void _rb_objc_rebuild_argc_argv(VALUE rb_argc, VALUE rb_argv);
+void _rb_objc_initialize_process_context(VALUE rb_argc, VALUE rb_argv);
+
 void Init_librigs();
 void Init_librigs_d();
 

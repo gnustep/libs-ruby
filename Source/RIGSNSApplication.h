@@ -41,7 +41,6 @@
 
 typedef struct global_entry * global_entry_ptr;
 
-void _RIGS_rebuild_argc_argv(VALUE rb_argc, VALUE rb_argv);
 VALUE _NSApplicationMainFromRuby(int arg_count, VALUE *arg_values, VALUE self);
 VALUE _RIGS_get_NSApp (ID rb_id, VALUE *data, global_entry_ptr entry);
 void _RIGS_set_NSApp (VALUE value, ID rb_id, VALUE *data,
