@@ -1,4 +1,4 @@
-#!/usr/local/bin/ruby
+#!/usr/bin/env ruby
 #
 # Ruby script to test the GUI part of RIGS
 #

@@ -1,4 +1,4 @@
-#!/usr/local/bin/ruby
+#!/usr/bin/env ruby
 #
 #  CurrencyConverter.m: A mini over-commented sample GNUstep app 
 #
