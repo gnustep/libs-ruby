@@ -1,4 +1,4 @@
-#!/usr/local/bin/ruby
+# rigs.rb - Main file to require to start using RIGS
 #
 # The initial boot strap code to  for RIGS. It preloads
 # some of the ObjC/GNUstep classes and sometimes
@@ -46,30 +46,30 @@ end
 
 
 
-class Object
 
-    #
-    # Invoking AT"a string..." in Ruby will automatically generate
-    # a NSString (the '@' sign can't be used as in GNUstep
-    # because it is a reserved character for instance and class
-    # variables. AT has no effect if String autoconversion is ON
-    #
-    def AT (stg)
-	if ($STRING_AUTOCONVERT)
-	    return stg
-	else
-	    return NSString.stringWithCString(stg)
-	end
-    end
-
-    #
-    # selector is a shortcut to NSSelector#new
-    # (mimics @selector in Objective C)
-    #
-    def selector (selString)
-	return NSSelector.new(selString)
+#
+# Invoking AT"a string..." in Ruby will automatically generate
+# a NSString (the '@' sign can't be used as in GNUstep
+# because it is a reserved character for instance and class
+# variables. AT has no effect if String autoconversion is ON
+#
+def AT (stg)
+    if ($STRING_AUTOCONVERT)
+	return stg
+    else
+	return NSString.stringWithCString(stg)
     end
 end
+
+#
+# selector is a shortcut to NSSelector#new
+# (mimics @selector in Objective C)
+#
+def selector (selString)
+    return NSSelector.new(selString)
+end
+
+
 
 module Rigs
 
@@ -91,45 +91,44 @@ module Rigs
     # class is  loaded ok whether the class is imported from the Ruby side
     # with import or automagically registered from Objective C
     def Rigs.import (className)
-	#puts "Entering import #{className}"
-	if !(Object.const_defined? className)
-	    classFile = "rigs/"+className+".rb"
-	    begin
-		require classFile
-		#puts "Ruby code for #{className} loaded"
-	    rescue LoadError
-		rbClass = Rigs.class(className)
-		if !(Object.const_defined? className)
-		    Object.const_set(className, rbClass)
-		    #puts "Objects constant #{className} set"
+	#puts "Entering import #{className}"	   
+	begin
+	    isClassDefined = Object.const_defined? className
+
+	    if not isClassDefined
+		classFile = "rigs/"+className+".rb"
+		begin
+		    result = require classFile
+		    #puts "Loading Ruby code for #{className} (result = #{result})..."
+		rescue LoadError
+		    #puts "Ruby code for #{className} not loaded..."
+		    rbClass = Rigs.class(className)
+		    if !(Object.const_defined? className)
+			Object.const_set(className, rbClass)
+			#puts "Objects constant #{className} set"
+		    end
 		end
 	    end
-	end
+	rescue NameError
+	    # The className is (probably) not a constant name
+	    # Some GNUstep class names start with an underscore which
+	    # is not understood as a Constant by Ruby. Hence the exception
+	    # The Class is however defined ok. It is simply not explicitely
+	    # accessible from the Ruby Side.
+	    puts "Warning: Rigs.import says #{className} is not a Constant - Doing nothing"
+	end 
 
-    end
+    end #def
 
 end
 
+# Systematically load these "pseudo" or Ruby only classes
+require 'rigs/NSRange.rb'
+require 'rigs/NSPoint.rb'
+require 'rigs/NSSize.rb'
+require 'rigs/NSRect.rb'
+require 'rigs/NSSelector.rb'
 
-# An example of using autoload so that the programmer
-# doesn't have to make a Rigs.import. For now just show how to
-# do it with a couple of classes(a class of our own). Later I might want
-# to extend the list to all GNUstep classes (we need one small .rb file
-# for each class (it's tedious....)
-#autoload :NSSelector, "rigs/NSSelector.rb"
-#autoload :NSString, "rigs/NSString.rb"
-#autoload :NSMutableString, "rigs/NSString.rb"
-#autoload :NSArray, "rigs/NSArray.rb"
-#autoload :NSMutableArray, "rigs/NSArray.rb"
-
-# For now just preload a reasonable set of Classes
-# Other will have to be loaded manually by the user
-#
-#Rigs.import("NSMutableString")
-#Rigs.import("NSMutableArray")
-#Rigs.import("NSApplication")
-#Rigs.import("NSMenu")
-#Rigs.import("NSLog")
 
 # Set it to true if you want all Ruby String arguments
 # to be automatically transformed to NSString
@@ -142,3 +141,9 @@ $STRING_AUTOCONVERT = false
 # In all cases you can invoke selector("selectorString:") in Ruby
 # to generate a selector.
 $SELECTOR_AUTOCONVERT = false
+
+# Set it to true if you want ObjC NSNumbers return values
+# to be automatically transformed into a Ruby numberl
+# In all cases Ruby numbers passed to ObjC are automatically
+# morphed to NSNumber when ObjC expects an id as argument
+$NUMBER_AUTOCONVERT = false
