@@ -55,8 +55,8 @@
 // Some conversion methods from Ruby names to ObjC selectors (SEL)
 // They are not really realted to the NSSelector class but they fit well
 // in there
-NSString* SelectorStringFromRubyName (char *name, BOOL hasArgs);
-SEL SelectorFromRubyName (char *name, BOOL hasArgs);
+NSString* SelectorStringFromRubyName (char *name, int numArgs);
+SEL SelectorFromRubyName (char *name, int numArgs);
 NSString* RubyNameFromSelector(SEL sel);
 NSString* RubyNameFromSelectorString(NSString *name);
 
