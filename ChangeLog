@@ -1,0 +1,180 @@
+2001-09-24 13:48  ljulliar
+
+	* Source/ObjcRuntimeUtilities.m: New version from Nicola Pero
+
+2001-09-24 13:34  ljulliar
+
+	* Ruby/rigs/NSColor.rb: enums, constants and wrapping code for
+	GNUstep classes
+
+2001-09-24 13:33  ljulliar
+
+	* Testing/: Base/run-test, Gui/run-test: Now run all *Test* files
+
+2001-09-24 13:29  ljulliar
+
+	* Source/: RIGSProxyIMP.m, RIGSProxySetup.m, RIGSWrapObject.m:
+	Minor changes due to C Structure handling
+
+2001-09-24 13:26  ljulliar
+
+	* Source/RIGSNSArray.m: Wrapping code for some ruby methods
+
+2001-09-24 13:25  ljulliar
+
+	* Source/RIGSNSApplication.m: Process Initialization code removed
+	(now in RIGSCore)
+
+2001-09-24 13:24  ljulliar
+
+	* Source/: RIGSCore.h, RIGSNSApplication.h, RIGSProxySetup.h:
+	Function prototypes modified
+
+2001-09-24 13:23  ljulliar
+
+	* Source/RIGSCore.m: Process Initialization added, C Structure
+	handling, new hash tables and NSNumber morphing
+
+2001-09-24 13:21  ljulliar
+
+	* Source/ObjcRuntimeUtilities.m: Minor correction for Cygwin
+
+2001-09-24 13:20  ljulliar
+
+	* Ruby/rigs/: NSArray.rb, NSDictionary.rb, NSMutableArray.rb,
+	NSMutableDictionary.rb, NSSelector.rb: Code cleanup for version
+	0.2.0
+
+2001-09-24 13:19  ljulliar
+
+	* Ruby/rigs/NSString.rb: Many new constants and method wrapping
+	code added (==, string encodings,...)
+
+2001-09-24 13:17  ljulliar
+
+	* Ruby/rigs/NSObject.rb: Some constants added and == method map to
+	isEqual
+
+2001-09-24 13:13  ljulliar
+
+	* Ruby/rigs.rb: Code cleanup and some additions
+
+2001-09-24 13:12  ljulliar
+
+	* Ruby/GNUmakefile: Delete all NSxxx.rb files from Ruby before
+	installing new ones
+
+2001-09-24 13:10  ljulliar
+
+	* Examples/Gui/FirstApp/FirstApp.rb: Improved with a window
+	containing a button
+
+2001-09-24 13:09  ljulliar
+
+	* Examples/Base/Simple.rb: Use require 'Foundation' now
+
+2001-09-24 13:07  ljulliar
+
+	* GNUmakefile, NEWS, README, TODO, Source/GNUmakefile: Updated for
+	version 0.2.0
+
+2001-09-24 13:05  ljulliar
+
+	* Testing/Gui/: NSApplicationTest.rb, NSButtonTest.rb,
+	NSButtonTest2.rb, NSWindowTest.rb: New GUI testing code
+
+2001-09-24 13:04  ljulliar
+
+	* Source/: RIGSNSString.h, RIGSNSString.m: Wrapping code for
+	NSString class
+
+2001-09-24 13:01  ljulliar
+
+	* Ruby/rigs/: NSApplication.rb, NSBezierPath.rb,
+	NSBitmapImageRep.rb, NSBox.rb, NSButtonCell.rb, NSCStringText.rb,
+	NSCell.rb, NSColorPanel.rb, NSDataLink.rb, NSDecimalNumber.rb,
+	NSDistributedNotificationCenter.rb, NSDocument.rb,
+	NSDraggingInfo.rb, NSDrawer.rb, NSEvent.rb, NSFont.rb,
+	NSFontManager.rb, NSFontPanel.rb, NSGraphicsContext.rb,
+	NSImageCell.rb, NSImageRep.rb, NSLayoutManager.rb, NSMatrix.rb,
+	NSNotificationQueue.rb, NSPageLayout.rb, NSParagraphStyle.rb,
+	NSPopUpButtonCell.rb, NSPrintInfo.rb, NSPrintOperation.rb,
+	NSPrintPanel.rb, NSPrinter.rb, NSRange.rb, NSResponder.rb,
+	NSRulerView.rb, NSRunLoop.rb, NSSavePanel.rb, NSScroller.rb,
+	NSTabView.rb, NSTabViewItem.rb, NSText.rb, NSTextAttachement.rb,
+	NSTextContainer.rb, NSTextStorage.rb, NSTextView.rb,
+	NSURLHandle.rb, NSView.rb, NSWindow.rb, NSPoint.rb, NSRect.rb,
+	NSSize.rb: enums, constants and wrapping code for GNUstep classes
+
+2001-09-24 12:54  ljulliar
+
+	* Ruby/AppKit.rb: Import all AppKit GUI classes at once
+
+2001-09-24 12:53  ljulliar
+
+	* Ruby/Foundation.rb: Import all Foundation classes at once
+
+2001-09-13 16:51  ljulliar
+
+	* README: minor english corrections
+
+2001-09-13 12:35  ljulliar
+
+	* README: README shortened and re-organized
+
+2001-09-12 23:29  ljulliar
+
+	* GNUmakefile, TODO, COPYING.LIB, INSTALL, NEWS, README, COPYING,
+	Testing/GNUmakefile, Testing/Base/GNUmakefile,
+	Testing/Base/run-test, Testing/Base/NSArrayTest.rb,
+	Testing/Base/NSDateTest.rb, Examples/Base/Simple.rb,
+	Examples/Gui/README, Examples/Gui/FirstApp/FirstApp.rb,
+	Examples/Gui/FirstApp/FirstAppInfo.plist,
+	Examples/Gui/FirstApp/GNUmakefile,
+	Examples/Gui/FirstApp/GNUmakefile.postamble,
+	Examples/Gui/FirstApp/fake.m, Testing/Base/NSDictionaryTest.rb,
+	Testing/Gui/GNUmakefile, Testing/Gui/run-test,
+	Examples/Gui/FirstApp/FirstAppIcon.tiff,
+	Source/ObjcRuntimeUtilities.h, Source/ObjcRuntimeUtilities.m,
+	Source/RIGS.h, Source/RIGSNSApplication.h,
+	Source/RIGSNSApplication.m, Source/RIGSProxy.h, Source/RIGSProxy.m,
+	Source/RIGSProxyIMP.h, Source/GNUmakefile, Source/RIGSProxyIMP.m,
+	Source/RIGSProxySetup.h, Source/RIGSProxySetup.m,
+	Source/RIGSSelectorMapping.h, Source/RIGSCore.h,
+	Source/RIGSSelectorMapping.m, Source/RIGSWrapObject.h,
+	Source/RIGSWrapObject.m, Source/GNUmakefile.postamble,
+	Source/RIGSCore.m, Source/RIGSNSArray.h, Source/RIGSNSArray.m,
+	Ruby/GNUmakefile, Ruby/rigs.rb, Ruby/rigs/NSArray.rb,
+	Ruby/rigs/NSMutableArray.rb, Ruby/rigs/NSMutableString.rb,
+	Ruby/rigs/NSObject.rb, Ruby/rigs/NSSelector.rb,
+	Ruby/rigs/NSString.rb, Ruby/rigs/NSDictionary.rb,
+	Ruby/rigs/NSMutableDictionary.rb: Initial revision
+
+2001-09-12 23:29  ljulliar
+
+	* GNUmakefile, TODO, COPYING.LIB, INSTALL, NEWS, README, COPYING,
+	Testing/GNUmakefile, Testing/Base/GNUmakefile,
+	Testing/Base/run-test, Testing/Base/NSArrayTest.rb,
+	Testing/Base/NSDateTest.rb, Examples/Base/Simple.rb,
+	Examples/Gui/README, Examples/Gui/FirstApp/FirstApp.rb,
+	Examples/Gui/FirstApp/FirstAppInfo.plist,
+	Examples/Gui/FirstApp/GNUmakefile,
+	Examples/Gui/FirstApp/GNUmakefile.postamble,
+	Examples/Gui/FirstApp/fake.m, Testing/Base/NSDictionaryTest.rb,
+	Testing/Gui/GNUmakefile, Testing/Gui/run-test,
+	Examples/Gui/FirstApp/FirstAppIcon.tiff,
+	Source/ObjcRuntimeUtilities.h, Source/ObjcRuntimeUtilities.m,
+	Source/RIGS.h, Source/RIGSNSApplication.h,
+	Source/RIGSNSApplication.m, Source/RIGSProxy.h, Source/RIGSProxy.m,
+	Source/RIGSProxyIMP.h, Source/GNUmakefile, Source/RIGSProxyIMP.m,
+	Source/RIGSProxySetup.h, Source/RIGSProxySetup.m,
+	Source/RIGSSelectorMapping.h, Source/RIGSCore.h,
+	Source/RIGSSelectorMapping.m, Source/RIGSWrapObject.h,
+	Source/RIGSWrapObject.m, Source/GNUmakefile.postamble,
+	Source/RIGSCore.m, Source/RIGSNSArray.h, Source/RIGSNSArray.m,
+	Ruby/GNUmakefile, Ruby/rigs.rb, Ruby/rigs/NSArray.rb,
+	Ruby/rigs/NSMutableArray.rb, Ruby/rigs/NSMutableString.rb,
+	Ruby/rigs/NSObject.rb, Ruby/rigs/NSSelector.rb,
+	Ruby/rigs/NSString.rb, Ruby/rigs/NSDictionary.rb,
+	Ruby/rigs/NSMutableDictionary.rb: Initial RIGS import to CVS
+
