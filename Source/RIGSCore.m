@@ -38,7 +38,10 @@
 
 #ifdef GNUSTEP
 #include <objc/encoding.h>
-#include <mframe.h>  // For the definition of the ROUND macro
+
+#define ROUND(V, A) \
+  ({ typeof(V) __v=(V); typeof(A) __a=(A); \
+     __a*((__v+__a-1)/__a); })
 #endif
 
 /* Do not include the whole <Foundation/Foundation.h> to avoid
