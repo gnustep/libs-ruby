@@ -44,12 +44,20 @@
 #include "ObjcRuntimeUtilities.h"
 #include <string.h>
 
+#ifndef objc_EXPORT
+#if libobjc_ISDLL /* linking against DLL version of libobjc */
+#  define objc_EXPORT  extern __declspec(dllimport)
+#else 
+#  define objc_EXPORT  extern
+#endif
+#endif
+
 BOOL ObjcUtilities_new_class (const char *name, 
 			      const char *superclassName, 
 			      int ivarNumber, ...)
 {
-  extern void __objc_exec_class (Module_t module);
-  extern void __objc_resolve_class_links ();
+  objc_EXPORT void __objc_exec_class (Module_t module);
+  objc_EXPORT void __objc_resolve_class_links ();
   Module_t module;
   Symtab_t symtab;
   Class super_class;
@@ -206,9 +214,9 @@ const char *ObjcUtilities_build_runtime_Objc_signature (const char
 
 void ObjcUtilities_register_method_list (Class class, MethodList *ml)
 {
-  extern void class_add_method_list (Class class, MethodList_t list);
+  objc_EXPORT void class_add_method_list (Class class, MethodList_t list);
   objc_EXPORT objc_mutex_t __objc_runtime_mutex;
-
+  
   objc_mutex_lock (__objc_runtime_mutex);
   class_add_method_list (class, ml);
   objc_mutex_unlock (__objc_runtime_mutex);
