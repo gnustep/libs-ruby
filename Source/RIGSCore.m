@@ -114,6 +114,21 @@ static VALUE numberAutoConvert = Qfalse;
 (numberAutoConvert == Qtrue)
 
 
+/* Define a couple of macros to get/set Ruby CStruct objects 
+    (CStruct class is the Ruby equivalent of the C structure */
+   
+#define RB_CSTRUCT_CLASS \
+rb_const_get(rb_cObject, rb_intern("CStruct"))
+
+#define RB_CSTRUCT_NEW() \
+rb_class_new_instance(0,NULL, RB_CSTRUCT_CLASS)
+
+#define RB_CSTRUCT_ENTRY(aCStruct, idx) \
+rb_funcall(aCStruct, rb_intern("[]"), 1, INT2FIX(idx))
+
+#define RB_CSTRUCT_PUSH(aCStruct, aValue) \
+rb_funcall(aCStruct, rb_intern("push"), 1, aValue)
+
 
 
 void
@@ -213,7 +228,7 @@ rb_objc_convert_to_objc(VALUE rb_thing,void *data, int offset, const char *type)
                    rb_thing, TYPE(rb_thing),*type,where);
 
         if (inStruct) {
-            rb_val = rb_ary_entry(rb_thing,(long) idx);
+            rb_val = RB_CSTRUCT_ENTRY(rb_thing,idx);
             idx++;
         } else {
             rb_val = rb_thing;
@@ -468,9 +483,8 @@ rb_objc_convert_to_objc(VALUE rb_thing,void *data, int offset, const char *type)
           {
             // We are attacking a new embedded structure in a structure
             
-            // For the time being we just accept Ruby Array as input to
-            // a C structure
-            if (TYPE(rb_val) == T_ARRAY) {
+            // The Ruby argument must be of type CStruct or a sub-class of it
+            if (rb_obj_is_kind_of(rb_val, RB_CSTRUCT_CLASS) == Qtrue) {
               
                 if ( rb_objc_convert_to_objc(rb_val, where, 0, type) == NO) {     
                     // if something went wrong in the conversion just return Qnil
@@ -756,14 +770,14 @@ rb_objc_convert_to_rb(void *data, int offset, const char *type, VALUE *rb_val_pt
 
           if (end == Qnil) {
               // first time in there so allocate a new Ruby array
-              end = rb_ary_new();
-              rb_ary_push(end, rb_val);
+              end = RB_CSTRUCT_NEW();
+              RB_CSTRUCT_PUSH(end, rb_val);
               *rb_val_ptr = end;
               
           } else {
               // Next component in the same structure. Append it to 
               // the end of the running Ruby array
-              rb_ary_push(end, rb_val);
+              RB_CSTRUCT_PUSH(end, rb_val);
           }
 
 
@@ -913,7 +927,8 @@ rb_objc_send_with_selector(SEL sel, int rb_argc, VALUE *rb_argv, VALUE rb_self)
     }
         
         
-    NSDebugLog(@">>>>> VALUE returned to Ruby 0x%lx",rb_retval);
+    NSDebugLog(@">>>>> VALUE returned to Ruby = 0x%lx (class %s)",
+               rb_retval, rb_class2name(CLASS_OF(rb_retval)));
         
     [pool release];	
     return rb_retval;
