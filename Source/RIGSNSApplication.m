@@ -33,17 +33,9 @@
 #include "RIGSCore.h"
 #import "RIGSNSApplication.h"
 
+
 // Ruvy view of the NSApp global GNUstep variable
 static VALUE rb_NSApp = Qnil;
-
-// Our own argc and argv rebuilt  from Ruby ARGV ($*)
-static char **ourargv;
-static int ourargc;
-
-extern char** environ;
-//extern char** argv;
-//extern char** argc;
-extern void _gnu_process_args(int argc, char *argv[], char *env[]);
 
 VALUE _RIGS_get_NSApp(ID rb_id, VALUE *data, global_entry_ptr entry) 
 {
@@ -71,9 +63,6 @@ _RIGS_rebuild_argc_argv(VALUE rb_argc, VALUE rb_argv)
     ourargv = malloc(sizeof(char *) * ourargc);
     ourargv[0] = STR2CSTR(rb_gv_get("$0"));
 
-
-    /* Can't use NSDebugLog before NSProcessInfo is initialized
-       at least on Windows platform (Linux is ok). So use printf */
     NSDebugLog(@"Argc=%d\n",ourargc);
     NSDebugLog(@"Argv[0]=%s\n",ourargv[0]);
      
@@ -87,28 +76,19 @@ _RIGS_rebuild_argc_argv(VALUE rb_argc, VALUE rb_argv)
 
 
 /* This function can be passed 0 argument or 2.
-   - If no argument is given then we rebuild argc and argv from
-      Ruby $* AND $0 global variables
-   - If 2 argument are passed they are argc in the form of a FIXNUM
-     and argv in the form of a Ruby array (unlike C we don't want $0,
-     the script name in argv[0]
+   - If no argument is given then just call NSApplicationMain()
+   - If 2 arguments  are passed they are new argc and argv that
+      are going to override the one we built automatically when 
+      librigs was loaded 
 
-The goal of this function is twofold:
-
-  1) Update the NSProcessInfo information with real argc, argv and env
-    (argv needs to be modified so that argv[0] reflects the ruby script
-    path as a process name instead of simply "ruby"
-
-  2) Modify the Main NSBundle to reflect the ruby script executable path of
-    because otherwise the executable path always says /usr/local/bin/ruby
-    and NSBundle never finds the application Resources (plist files, etc...)
-
+    argc in the form of a FIXNUM, and argv in the form of a Ruby
+    array (unlike C argv[0] doens't contain the script name which is
+    always in $0))
 */
 VALUE _NSApplicationMainFromRuby(int arg_count, VALUE *arg_values, VALUE self) 
 {
-  VALUE rb_argc;
-  VALUE rb_argv;
-  id pool = [NSAutoreleasePool new];
+
+    id pool = [NSAutoreleasePool new];
 
   
     NSDebugLog(@"Arguments in NSProcessInfo before rebuild: %@",[[NSProcessInfo processInfo] arguments]);
@@ -116,86 +96,27 @@ VALUE _NSApplicationMainFromRuby(int arg_count, VALUE *arg_values, VALUE self)
 
     if (arg_count == 0) {
 
-      rb_argv = rb_gv_get("$*");
-      rb_argc = INT2FIX(RARRAY(rb_argv)->len);
+        // Nothing to be done. Use the defaults as set when librigs
+        // was loaded (See RIGSCore.m)
 
     } else if (arg_count == 2) {
 
-      rb_argc = arg_values[0];
-      rb_argv = arg_values[1];
-      if ( (TYPE(rb_argc) != T_FIXNUM) || (TYPE(rb_argv) != T_ARRAY) ) {
-        rb_raise(rb_eTypeError, "invalid type of arguments (must be an Integer and an Array)");
-      }
+        // So explicit arguments where passed from Ruby. This is really
+        // unusual but in this case re-configure again the process context
+        VALUE rb_argc = arg_values[0];
+        VALUE rb_argv = arg_values[1];
+        if ( (TYPE(rb_argc) != T_FIXNUM) || (TYPE(rb_argv) != T_ARRAY) ) {
+            rb_raise(rb_eTypeError, "invalid type of arguments (must be an Integer and an Array)");
+        }
+
+        // Rebuild argv and argc from Ruby ARGV array
+        _rb_objc_initialize_process_context(rb_argc, rb_argv);
       
+
     } else {
         rb_raise(rb_eArgError, "wrong # of arguments (%d for 0 or 2)", arg_count);
     }
-
-    // Rebuild argv and argc from Ruby ARGV array
-    _RIGS_rebuild_argc_argv(rb_argc,rb_argv);
         
-    // (Re) Initialize a GNUstep Processinfo structure to take into account the 
-    // the debug flag given on the command line (--GNU-Debug=dflt)
-    // We cannot use NSProcessInfo initializeWithArguments: because it
-    // was called at the very beginning by the NSProcessInfo +load method
-    // and calling it a second time has no effect (See NSApplication.m)
-    // (FIXME?? : the only work around I have found is to call the internal
-    // function _gnu_process_args again
-    _gnu_process_args(ourargc,ourargv,environ);
-    
-    // Calling NSBundle +initialize again
-    // doesn't work because _executable_path is taken from the proc fs
-    // filesystem which always says /usr/local/bin/ruby
-    // And NSBundle mainBundle relies on _executable_path so... we are stuck
-    //[NSBundle initialize];
-    //[NSBundle mainBundle];
-
-    // So basically redo here what the NSBundle +mainBundle does 
-    // but with  the executable path taken from argv[0]
-    {
-      NSString *path, *s;
-      NSBundle *b;
-      
-      
-      // Get access to the current main bundle
-      b = [NSBundle mainBundle];
-      NSDebugLog(@"Current Main Bundle path: %@", [b bundlePath]);
-
-      path = [[[NSProcessInfo processInfo] arguments] objectAtIndex: 0];
-      path = [NSBundle _absolutePathOfExecutable: path];
-      path = [path stringByDeletingLastPathComponent];
-
-      // For some reason _library_combo, _gnustep_target_* methods are not
-      // visible (why?) so simply strip the 3 path components assuming they are
-      // here (FIXME?)
-      s = [path lastPathComponent];
-      //if ([s isEqual: [NSBundle _library_combo]])
-	path = [path stringByDeletingLastPathComponent];
-      /* target os */
-      s = [path lastPathComponent];
-      //if ([s isEqual: [NSBundle _gnustep_target_os]])
-	path = [path stringByDeletingLastPathComponent];
-      /* target cpu */
-      s = [path lastPathComponent];
-      //if ([s isEqual: [NSBundle _gnustep_target_cpu]])
-	path = [path stringByDeletingLastPathComponent];
-      /* object dir */
-      s = [path lastPathComponent];
-      if ([s hasSuffix: @"_obj"])
-	path = [path stringByDeletingLastPathComponent];
-
-      NSDebugLog(@"New generated path to application: %@", path);
-      
-      /* We do alloc and init separately so initWithPath: knows
-          we are the _mainBundle */
-      //_mainBundle = [NSBundle alloc];
-      [b initWithPath:path];
-    
-  
-      NSDebugLog(@"New Main Bundle path: %@", [[NSBundle mainBundle] bundlePath]);
-    }
-      
-    NSDebugLog(@"Arguments in NSProcessInfo after rebuild: %@",[[NSProcessInfo processInfo] arguments]);
 
     [pool release];
     
