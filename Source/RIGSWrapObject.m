@@ -120,6 +120,7 @@ static NSMutableDictionary *_rodict = NULL;
 {
     id pool = [NSAutoreleasePool new];
     int nbArgs;
+    int mthReturnLength;
     unsigned int i;
     VALUE *rbargs, rbval;
     id objcArg;
@@ -153,7 +154,9 @@ static NSMutableDictionary *_rodict = NULL;
     rbargs = malloc((nbArgs-2) * sizeof(VALUE));
     
     for(i=2; i < nbArgs; i++) {
+
         [anInvocation getArgument:&objcArg atIndex:i ];
+
 #if     defined(GNUSTEP_BASE_VERSION)
         type = [signature getArgumentTypeAtIndex: i];
 #elif   defined(LIB_FOUNDATION_LIBRARY)
@@ -165,7 +168,7 @@ static NSMutableDictionary *_rodict = NULL;
         [anInvocation getArgument:data atIndex:i ];
 
         NSDebugLog(@"   -arg%d: ObjC id 0x%lx, type %c", *(id *)data,*type);
-        okydoky = rb_objc_convert_to_rb(data, type, &rbargs[i]);
+        okydoky = rb_objc_convert_to_rb(data, 0, type, &rbargs[i]);
     }
 
     /*
@@ -176,10 +179,13 @@ static NSMutableDictionary *_rodict = NULL;
     
     free(rbargs);
     
-    if([signature methodReturnLength]) {
+    mthReturnLength = [signature methodReturnLength];
+    
+    if(mthReturnLength) {
+        
       type = [signature methodReturnType];
-      data = alloca([signature methodReturnLength]);
-      okydoky = rb_objc_convert_to_objc(rbval, data, type);
+      data = alloca(mthReturnLength);
+      okydoky = rb_objc_convert_to_objc(rbval, data, 0, type);
 
       [anInvocation setReturnValue:data];
     }
@@ -213,13 +219,15 @@ static NSMutableDictionary *_rodict = NULL;
 {
   NSString* rbSELstg;
   VALUE rbval;
-  char idType = _C_ID;
+  const char idType[] = {_C_ID,'\0'};
   id objcRet;
 
   rbSELstg = RubyNameFromSelector(aSelector);
-  rbval = rb_funcall(_ro, rb_intern([rbSELstg cString]), 0);
 
-  rb_objc_convert_to_objc(rbval, (void*)&objcRet, &idType );
+  NSDebugLog(@"Ruby Wrapped Object received performSelector:  '%@'",rbSELstg);
+
+  rbval = rb_funcall(_ro, rb_intern([rbSELstg cString]), 0);
+  rb_objc_convert_to_objc(rbval, (void*)&objcRet, 0, idType);
   return objcRet;
   
 }
@@ -228,16 +236,20 @@ static NSMutableDictionary *_rodict = NULL;
 {
   NSString* rbSELstg;
   VALUE rbval, rbarg;
-  char idType = _C_ID;
+  const char idType[] = {_C_ID,'\0'};
   id objcRet;
   BOOL okydoky;
 
+
   rbSELstg = RubyNameFromSelector(aSelector);
-  okydoky = rb_objc_convert_to_rb((void *)&anObject,&idType,&rbarg);
+
+  NSDebugLog(@"Ruby Wrapped Object received performSelector:  '%@' withObject: %@",rbSELstg, anObject);
+
+  okydoky = rb_objc_convert_to_rb((void *)&anObject,0,idType,&rbarg);
 
   rbval = rb_funcall(_ro, rb_intern([rbSELstg cString]), 1, rbarg);
- 
-  okydoky = rb_objc_convert_to_objc(rbval,(void*)&objcRet, &idType );
+
+  okydoky = rb_objc_convert_to_objc(rbval,(void*)&objcRet, 0, idType );
 
   return objcRet;
 
@@ -247,18 +259,20 @@ static NSMutableDictionary *_rodict = NULL;
 {
   NSString* rbSELstg;
   VALUE rbval, rbarg1, rbarg2;
-  char idType = _C_ID;
+  const char idType[] = {_C_ID,'\0'};
   id objcRet;
   BOOL okydoky;
 
   rbSELstg = RubyNameFromSelector(aSelector);
-  okydoky = rb_objc_convert_to_rb((void *)&object1,&idType,&rbarg1);
-  okydoky = rb_objc_convert_to_rb((void *)&object2,&idType,&rbarg2);
 
-  rbval = rb_funcall(_ro, rb_intern([rbSELstg cString]), 2, rbarg1, rbarg2);
-  
+  NSDebugLog(@"Ruby Wrapped Object received performSelector:  '%@' withObject: %@ withObject: %@",rbSELstg, object1, object2);
 
-  okydoky = rb_objc_convert_to_objc(rbval,(void*)&objcRet, &idType );
+  okydoky = rb_objc_convert_to_rb((void *)&object1,0,idType,&rbarg1);
+  okydoky = rb_objc_convert_to_rb((void *)&object2,0,idType,&rbarg2);
+
+  rbval = rb_funcall(_ro, rb_intern([rbSELstg cString]), 2, rbarg1, rbarg2); 
+ 
+  okydoky = rb_objc_convert_to_objc(rbval,(void*)&objcRet, 0, idType );
   return objcRet;
 
 }

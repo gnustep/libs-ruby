@@ -182,10 +182,11 @@ Class _RIGS_register_ruby_class (VALUE rb_class)
         }
         
         // Build the method ObjC types and then the full signature
-        guessed = _RIGS_build_objc_types(rb_class, rb_mth_name, nbArgs, objcTypes);
+        guessed = _RIGS_build_objc_types(rb_class, rb_mth_name, '\0', nbArgs, objcTypes);
         signature = ObjcUtilities_build_runtime_Objc_signature(objcTypes); 
         
         NSDebugLog(@"Inserting ObjC method %@ with signature '%s'",objcMthName,signature);
+
 
         switch (*objcTypes)
           {
@@ -306,7 +307,8 @@ VALUE _RIGS_register_ruby_class_from_ruby (VALUE self, VALUE rb_class)
    selector and use it.
 */
 
-BOOL _RIGS_build_objc_types(VALUE rb_class, const char *rb_mth_name, int nbArgs, char *objcTypes)
+BOOL _RIGS_build_objc_types(VALUE rb_class, const char *rb_mth_name, 
+                            const char retValueType, int nbArgs, char *objcTypes)
 {
   VALUE rb_objc_types;
   int j;
@@ -340,12 +342,19 @@ BOOL _RIGS_build_objc_types(VALUE rb_class, const char *rb_mth_name, int nbArgs,
     // Nothing given on the Ruby side so...
     // Assume that we always return something (an id) and add as many
     // arguments of type object as needed by the arity of the Ruby method
+ 
     strcpy(objcTypes,"@@:");
     for (j=0;j<nbArgs;j++) {
       strcat(objcTypes,"@");
     }
-    NSDebugLog(@"Assuming ObjC Types  '%s' found in Ruby for method %s",
-                   objcTypes, rb_mth_name);
+    // If the type of the return value is given as an argument then override
+    // the default _C_ID ('@')
+    if (retValueType) {
+         objcTypes[0] = retValueType;
+     }
+     
+    NSDebugLog(@"ObjC types for method '%s' not found in Ruby. Assuming  '%s' ",
+               rb_mth_name, objcTypes);
   }
 
   return found;

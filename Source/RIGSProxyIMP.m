@@ -39,6 +39,7 @@
 
 #define COMMON_VAR_DECLARATION \
   const char *type; \
+  const char *return_type; \
   Class class = (Class)(rcv->class_pointer); \
   const char *className; \
   const char *rb_mth_name; \
@@ -49,7 +50,7 @@
   VALUE rb_rcv = Qnil; \
   VALUE rb_ret; \
   VALUE *rb_args; \
-  char types[128]; \
+  char objcTypes[128]; \
   BOOL okydoky, guessed;
 
 #define ENTER(IMPname) \
@@ -86,10 +87,11 @@
   nbArgs = _RIGS_ruby_method_arity(className, rb_mth_name);
 
 
-#define BUILD_METHOD_SIGNATURE \
-  guessed = _RIGS_build_objc_types(rb_class, rb_mth_name, nbArgs, types); \
+#define BUILD_METHOD_SIGNATURE(retValueType) \
+  guessed = _RIGS_build_objc_types(rb_class, rb_mth_name, retValueType, nbArgs, objcTypes); \
  \
-  type = ObjcUtilities_build_runtime_Objc_signature(types); \
+  type = ObjcUtilities_build_runtime_Objc_signature(objcTypes); \
+  return_type = type; \
   NSDebugLog(@"Generated signature '%s'", type); \
 
 /*
@@ -97,17 +99,23 @@
  */
 
 #define INIT_PROCESS_ARGS              \
-      type = objc_skip_argspec (type); \
-      type = objc_skip_argspec (type); \
-      type = objc_skip_argspec (type); \
+      type = objc_skip_argspec (type); /* skip return type	*/ \
+      type = objc_skip_argspec (type); /* skip receiver */ \
+      type = objc_skip_argspec (type); /* skip selector */ \
                                        \
       va_start (ap, sel);              \
       i = 0;
 
 #define DO_PROCESS_ARGS                                \
-      while (*type != '\0') {                          \
-	  okydoky = rb_objc_convert_to_rb(va_arg(ap,id), type, &rb_args[i]); \
-	  type = objc_skip_argspec (type);             \
+      while (*type != '\0') {                           \
+          int size = objc_sizeof_type(type); \
+	      { \
+		struct dummy {  char val[size]; } block; \
+                int offset = 0; \
+                block = va_arg(ap, struct dummy); \
+	        okydoky = rb_objc_convert_to_rb((void *) &block, offset, type, &rb_args[i]); \
+              } \
+          type = objc_skip_argspec (type); \
 	  i++; }                               
 
 #define END_PROCESS_ARGS va_end(ap);
@@ -124,9 +132,9 @@
   rb_ret = rb_funcall2(rb_rcv, rb_intern(rb_mth_name), nbArgs, rb_args); \
   NSDebugLog(@"Ruby value returned to this IMP : 0x%lx", rb_ret);
 
-#define CONVERT_RETURN_VALUE_TO_OBJC(objctype) \
-  { char return_type = objctype; \
-    okydoky = rb_objc_convert_to_objc(rb_ret, (void*)&objcRet, &return_type); \
+#define CONVERT_RETURN_VALUE_TO_OBJC \
+  { int offset = 0; \
+    okydoky = rb_objc_convert_to_objc(rb_ret, (void*)&objcRet, offset, return_type); \
    }
 
 #define LEAVE(IMPname) \
@@ -146,31 +154,24 @@
 id _RIGS_id_IMP_RubyMethod (id rcv, SEL sel, ...)
 {
     COMMON_VAR_DECLARATION
-    unsigned char final_return_type;
-    unsigned char return_type;
+    char final_return_type;
     id objcRet = nil;
     
     ENTER(_RIGS_id_IMP_RubyMethod);
-    
     GET_CLASSNAME;
     GET_RUBY_METHOD_NAME;
-    
     GET_AND_CHECK_RECEIVER;
-    
     GET_NUMBER_OF_ARGUMENTS;
-
-    BUILD_METHOD_SIGNATURE;
-    // Keep the return type aside for later re-use
-    return_type = (unsigned char)*type;
+    BUILD_METHOD_SIGNATURE(_C_ID);
   
     PROCESS_ARGS;
-    
     RUN_RUBY_METHOD;
 
     // return the value to ObjC
-    // if the method signature was guessed then try to be more accurate
-    // by looking at the value returned by Ruby. Else simply use the return type
-    // provided in the signature
+    // if the method signature was initially "guessed" because there was
+    // nothing in the @@objc_types Class variable in Ruby then try to
+    // be more accurate by looking at the value type returned by Ruby.
+    // Else simply use the return type provided in the initial signature
     if (guessed) { 
 
         final_return_type = _RIGS_guess_objc_return_type(rb_ret);
@@ -178,7 +179,12 @@ id _RIGS_id_IMP_RubyMethod (id rcv, SEL sel, ...)
         // If return type could not be guessed or was too risky to guess
         // then raise an exception
         if (final_return_type) {
-            return_type = final_return_type;
+ 
+            // FIXME !!! Here we dangerously patch the first character of
+            // method return type (don't know if this is really portable and/or
+            // safe
+           *(char *)return_type = final_return_type;
+
         } else {
             
             NSString *reason = 
@@ -189,7 +195,7 @@ id _RIGS_id_IMP_RubyMethod (id rcv, SEL sel, ...)
 
     }
     
-    CONVERT_RETURN_VALUE_TO_OBJC(_C_ID);
+    CONVERT_RETURN_VALUE_TO_OBJC;
     
     LEAVE(_RIGS_id_IMP_RubyMethod);
     RETURN_TO_OBJC;
@@ -207,10 +213,10 @@ Class _RIGS_Class_IMP_RubyMethod (id rcv, SEL sel, ...)
     GET_RUBY_METHOD_NAME;
     GET_AND_CHECK_RECEIVER;
     GET_NUMBER_OF_ARGUMENTS;
-    BUILD_METHOD_SIGNATURE;
+    BUILD_METHOD_SIGNATURE(_C_CLASS);
     PROCESS_ARGS;
     RUN_RUBY_METHOD;
-    CONVERT_RETURN_VALUE_TO_OBJC(_C_CLASS);
+    CONVERT_RETURN_VALUE_TO_OBJC;
     LEAVE(_RIGS_Class_IMP_RubyMethod);
     RETURN_TO_OBJC;
 }
@@ -226,10 +232,10 @@ SEL _RIGS_SEL_IMP_RubyMethod (id rcv, SEL sel, ...)
     GET_RUBY_METHOD_NAME;
     GET_AND_CHECK_RECEIVER;
     GET_NUMBER_OF_ARGUMENTS;
-    BUILD_METHOD_SIGNATURE;
+    BUILD_METHOD_SIGNATURE(_C_SEL);
     PROCESS_ARGS;
     RUN_RUBY_METHOD;
-    CONVERT_RETURN_VALUE_TO_OBJC(_C_SEL);
+    CONVERT_RETURN_VALUE_TO_OBJC;
     LEAVE(_RIGS_SEL_IMP_RubyMethod);
     RETURN_TO_OBJC;
 }
@@ -243,7 +249,7 @@ void _RIGS_void_IMP_RubyMethod (id rcv, SEL sel, ...)
     GET_RUBY_METHOD_NAME;
     GET_AND_CHECK_RECEIVER_NO_RETURN;
     GET_NUMBER_OF_ARGUMENTS;
-    BUILD_METHOD_SIGNATURE;
+    BUILD_METHOD_SIGNATURE(_C_VOID);
     PROCESS_ARGS;
     RUN_RUBY_METHOD;
     LEAVE(_RIGS_void_IMP_RubyMethod);
@@ -260,10 +266,10 @@ char *_RIGS_char_ptr_IMP_RubyMethod (id rcv, SEL sel, ...)
     GET_RUBY_METHOD_NAME;
     GET_AND_CHECK_RECEIVER;
     GET_NUMBER_OF_ARGUMENTS;
-    BUILD_METHOD_SIGNATURE;
+    BUILD_METHOD_SIGNATURE(_C_CHARPTR);
     PROCESS_ARGS;
     RUN_RUBY_METHOD;
-    CONVERT_RETURN_VALUE_TO_OBJC(_C_CHARPTR);
+    CONVERT_RETURN_VALUE_TO_OBJC;
     LEAVE(_RIGS_char_ptr_IMP_RubyMethod);
     RETURN_TO_OBJC;
 }
@@ -297,7 +303,7 @@ char _RIGS_char_IMP_RubyMethod (id rcv, SEL sel, ...)
     GET_NUMBER_OF_ARGUMENTS;
   
   // Build the ObjC types string
-    BUILD_METHOD_SIGNATURE;
+    BUILD_METHOD_SIGNATURE(_C_CHR);
  
    
     // Process Arguments
@@ -310,7 +316,7 @@ char _RIGS_char_IMP_RubyMethod (id rcv, SEL sel, ...)
     RUN_RUBY_METHOD;
 
     // convert the value returned by Ruby and return it to ObjC caller
-    CONVERT_RETURN_VALUE_TO_OBJC(_C_CHR);
+    CONVERT_RETURN_VALUE_TO_OBJC;
     LEAVE(_RIGS_char_IMP_RubyMethod);
     RETURN_TO_OBJC;
 }
@@ -328,10 +334,10 @@ _RIGS_unsigned_char_IMP_RubyMethod (id rcv, SEL sel, ...)
     GET_RUBY_METHOD_NAME;
     GET_AND_CHECK_RECEIVER;
     GET_NUMBER_OF_ARGUMENTS;
-    BUILD_METHOD_SIGNATURE;
+    BUILD_METHOD_SIGNATURE(_C_UCHR);
     PROCESS_ARGS;
     RUN_RUBY_METHOD;
-    CONVERT_RETURN_VALUE_TO_OBJC(_C_UCHR);
+    CONVERT_RETURN_VALUE_TO_OBJC;
     LEAVE(_RIGS_unsigned_char_IMP_RubyMethod);
     RETURN_TO_OBJC;
 }
@@ -348,10 +354,10 @@ _RIGS_short_IMP_RubyMethod (id rcv, SEL sel, ...)
     GET_RUBY_METHOD_NAME;
     GET_AND_CHECK_RECEIVER;
     GET_NUMBER_OF_ARGUMENTS;
-    BUILD_METHOD_SIGNATURE;
+    BUILD_METHOD_SIGNATURE(_C_SHT);
     PROCESS_ARGS;
     RUN_RUBY_METHOD;
-    CONVERT_RETURN_VALUE_TO_OBJC(_C_SHT);
+    CONVERT_RETURN_VALUE_TO_OBJC;
     LEAVE(_RIGS_short_IMP_RubyMethod);
     RETURN_TO_OBJC;
 }
@@ -368,10 +374,10 @@ _RIGS_unsigned_short_IMP_RubyMethod (id rcv, SEL sel, ...)
     GET_RUBY_METHOD_NAME;
     GET_AND_CHECK_RECEIVER;
     GET_NUMBER_OF_ARGUMENTS;
-    BUILD_METHOD_SIGNATURE;
+    BUILD_METHOD_SIGNATURE(_C_USHT);
     PROCESS_ARGS;
     RUN_RUBY_METHOD;
-    CONVERT_RETURN_VALUE_TO_OBJC(_C_USHT);
+    CONVERT_RETURN_VALUE_TO_OBJC;
     LEAVE(_RIGS_unsigned_short_IMP_RubyMethod);
     RETURN_TO_OBJC;
 }
@@ -388,10 +394,10 @@ _RIGS_int_IMP_RubyMethod (id rcv, SEL sel, ...)
     GET_RUBY_METHOD_NAME;
     GET_AND_CHECK_RECEIVER;
     GET_NUMBER_OF_ARGUMENTS;
-    BUILD_METHOD_SIGNATURE;
+    BUILD_METHOD_SIGNATURE(_C_INT);
     PROCESS_ARGS;
     RUN_RUBY_METHOD;
-    CONVERT_RETURN_VALUE_TO_OBJC(_C_INT);
+    CONVERT_RETURN_VALUE_TO_OBJC;
     LEAVE(_RIGS_int_IMP_RubyMethod);
     RETURN_TO_OBJC;
 }
@@ -404,22 +410,14 @@ _RIGS_unsigned_int_IMP_RubyMethod (id rcv, SEL sel, ...)
 
     
     ENTER(_RIGS_unsigned_int_IMP_RubyMethod);
-
     GET_CLASSNAME;
     GET_RUBY_METHOD_NAME;
-
     GET_AND_CHECK_RECEIVER;
-
     GET_NUMBER_OF_ARGUMENTS;
-
-    BUILD_METHOD_SIGNATURE;
-
+    BUILD_METHOD_SIGNATURE(_C_UINT);
     PROCESS_ARGS;
-
     RUN_RUBY_METHOD;
-
-    CONVERT_RETURN_VALUE_TO_OBJC(_C_UINT);
-  
+    CONVERT_RETURN_VALUE_TO_OBJC;
     LEAVE(_RIGS_unsigned_int_IMP_RubyMethod);
     RETURN_TO_OBJC;
 }
@@ -432,22 +430,14 @@ _RIGS_long_IMP_RubyMethod (id rcv, SEL sel, ...)
 
     
     ENTER(_RIGS_long_IMP_RubyMethod);
-
     GET_CLASSNAME;
     GET_RUBY_METHOD_NAME;
-
     GET_AND_CHECK_RECEIVER;
-
     GET_NUMBER_OF_ARGUMENTS;
-
-    BUILD_METHOD_SIGNATURE;
-
+    BUILD_METHOD_SIGNATURE(_C_LNG);
     PROCESS_ARGS;
-
     RUN_RUBY_METHOD;
-
-    CONVERT_RETURN_VALUE_TO_OBJC(_C_LNG);
-  
+    CONVERT_RETURN_VALUE_TO_OBJC;
     LEAVE(_RIGS_long_IMP_RubyMethod);
     RETURN_TO_OBJC;
 }
@@ -460,22 +450,14 @@ _RIGS_unsigned_long_IMP_RubyMethod (id rcv, SEL sel, ...)
 
     
     ENTER(_RIGS_unsigned_long_IMP_RubyMethod);
-
     GET_CLASSNAME;
     GET_RUBY_METHOD_NAME;
-
     GET_AND_CHECK_RECEIVER;
-
     GET_NUMBER_OF_ARGUMENTS;
-
-    BUILD_METHOD_SIGNATURE;
-
+    BUILD_METHOD_SIGNATURE(_C_ULNG);
     PROCESS_ARGS;
-
     RUN_RUBY_METHOD;
-
-    CONVERT_RETURN_VALUE_TO_OBJC(_C_ULNG);
-  
+    CONVERT_RETURN_VALUE_TO_OBJC;
     LEAVE(_RIGS_unsigned_long_IMP_RubyMethod);
     RETURN_TO_OBJC;
 }
@@ -488,22 +470,14 @@ _RIGS_float_IMP_RubyMethod (id rcv, SEL sel, ...)
 
     
     ENTER(_RIGS_float_IMP_RubyMethod);
-
     GET_CLASSNAME;
     GET_RUBY_METHOD_NAME;
-
     GET_AND_CHECK_RECEIVER;
-
     GET_NUMBER_OF_ARGUMENTS;
-
-    BUILD_METHOD_SIGNATURE;
-
+    BUILD_METHOD_SIGNATURE(_C_FLT);
     PROCESS_ARGS;
-
     RUN_RUBY_METHOD;
-
-    CONVERT_RETURN_VALUE_TO_OBJC(_C_FLT);
-  
+    CONVERT_RETURN_VALUE_TO_OBJC;
     LEAVE(_RIGS_float_IMP_RubyMethod);
     RETURN_TO_OBJC;
 }
@@ -516,22 +490,14 @@ _RIGS_double_IMP_RubyMethod (id rcv, SEL sel, ...)
 
     
     ENTER(_RIGS_double_IMP_RubyMethod);
-
     GET_CLASSNAME;
     GET_RUBY_METHOD_NAME;
-
     GET_AND_CHECK_RECEIVER;
-
     GET_NUMBER_OF_ARGUMENTS;
-
-    BUILD_METHOD_SIGNATURE;
-
+    BUILD_METHOD_SIGNATURE(_C_DBL);
     PROCESS_ARGS;
-
     RUN_RUBY_METHOD;
-
-    CONVERT_RETURN_VALUE_TO_OBJC(_C_DBL);
-  
+    CONVERT_RETURN_VALUE_TO_OBJC;
     LEAVE(_RIGS_double_IMP_RubyMethod);
     RETURN_TO_OBJC;
 }
