@@ -126,7 +126,13 @@ AppKitClasses = [
 "NSTextContainer",
 "NSTextStorage",
 "NSUserInterfaceValidation",
-"NSWindowController"]
+"NSWindowController",
 
+# GNUstep extensions
+"GSTable",
+"GSHbox",
+"GSVbox" ]
+
+# Now import them all
 AppKitClasses.each { |aClass|  Rigs.import(aClass) }
 
