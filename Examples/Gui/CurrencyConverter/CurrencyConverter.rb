@@ -130,7 +130,7 @@ class CurrencyConverter
 	# Use automatic height
 	@field[0].sizeToFit
 	# But set width to 100
-	size = @field[0].frame.rsize
+	size = @field[0].frame.size
 	size.width = 100
 	@field[0].setFrameSize size
 	@field[0].setAutoresizingMask NSViewWidthSizable
@@ -175,7 +175,7 @@ class CurrencyConverter
 	    # Use automatic height
 	    @field[i].sizeToFit
 	    # But set width to 100
-	    size = @field[i].frame.rsize
+	    size = @field[i].frame.size
 	    size.width = 100
 	    @field[i].setFrameSize size
 	    @field[i].setAutoresizingMask NSViewWidthSizable
@@ -205,7 +205,7 @@ class CurrencyConverter
 	# Window
 	#
 	winFrame = NSRect.new
-	winFrame.rsize = windowVbox.frame.rsize
+	winFrame.size = windowVbox.frame.size
 	winFrame.origin = NSPoint.new(100, 100)
 
 	# Now we can make the window of the exact size  
@@ -218,7 +218,7 @@ class CurrencyConverter
 	@window.setTitle "CurrencyConverter.app"
 	@window.setContentView windowVbox
 	minSize = NSWindow.frameRectForContentRect_styleMask(
-				winFrame, @window.styleMask).rsize
+				winFrame, @window.styleMask).size
 	@window.setMinSize minSize
 
 	# Trick to forbid vertical resizing

@@ -105,7 +105,7 @@ class MyDelegate
 	button.setTitle("Print Hello!")
 	button.sizeToFit()
 
-	buttonSize = button.frame.rsize
+	buttonSize = button.frame.size
 
 #	rect = NSRect.new(100, 100 , buttonSize.width, buttonSize.height)
 	rect = NSRect.new(0, 0, 400, 200)
