@@ -53,12 +53,12 @@
   int i;
   int count;
   id *gnustepObjects;
-  unsigned char objc_type = _C_ID;
   VALUE rb_elt;
   BOOL okydoky;
   VALUE ruby_array = [wrapped_ruby_array getRubyObject];
+  const char idType[] = {_C_ID,'\0' };
   
-      
+  
   // A nil value should not get there. It should be a 
   // Ruby Array in any case
   if ( NIL_P(ruby_array) || (TYPE(ruby_array) != T_ARRAY) )
@@ -72,12 +72,13 @@
   }
 
   // Loop through the elements of the ruby array, convert them to GNUstep
-  // objects and feed them into a new NSArray
+  // objects (only Objects id can go into an NSArray anyway) and feed them
+  // into a new NSArray
   for (i = 0; i < count; i++) {
-      rb_elt = rb_ary_entry(ruby_array, (long)i);
-      //      objc_type = _RIGS_guess_objc_return_type(rb_elt);
       
-      okydoky = rb_objc_convert_to_objc(rb_elt, &gnustepObjects[i], &objc_type);
+      rb_elt = rb_ary_entry(ruby_array, (long)i);
+     
+      okydoky = rb_objc_convert_to_objc(rb_elt, &gnustepObjects[i], 0,idType);
   }
 
   returnArray = [array initWithObjects: gnustepObjects  count:count];
