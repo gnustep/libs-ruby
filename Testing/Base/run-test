@@ -31,7 +31,7 @@
 
 log_file=test.log
 
-tests_to_run=`ls *Test.rb`
+tests_to_run=`ls *Test*.rb`
 
 failed=no
 
