@@ -207,8 +207,8 @@ const char *ObjcUtilities_build_runtime_Objc_signature (const char
 void ObjcUtilities_register_method_list (Class class, MethodList *ml)
 {
   extern void class_add_method_list (Class class, MethodList_t list);
-  extern objc_mutex_t __objc_runtime_mutex;
-  
+  objc_EXPORT objc_mutex_t __objc_runtime_mutex;
+
   objc_mutex_lock (__objc_runtime_mutex);
   class_add_method_list (class, ml);
   objc_mutex_unlock (__objc_runtime_mutex);
