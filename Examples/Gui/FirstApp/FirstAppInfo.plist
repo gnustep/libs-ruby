@@ -1,0 +1,8 @@
+{
+  ApplicationName = "My First Application";
+  ApplicationDescription = "A basic GNUstep application written in Ruby";
+  ApplicationRelease = "0.1";
+  Authors = ("Laurent Julliard <laurent@julliard-online.org>");
+  Copyright = "Copyright (c) 2001 Free Software Foundation";
+  CopyrightDescription = "This program is released under the GNU GPL"; 
+}
