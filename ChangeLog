@@ -1,3 +1,7 @@
+2003-07-31  David Ayers  <d.ayers@inode.at>
+
+	* Source/RIGSCore.m: Remove reference to private header.
+
 2003-05-29  Tobias <ibotty@web.de>
 
 	* Source/RIGSCore.m (class_getNextMethodList): Rename from
