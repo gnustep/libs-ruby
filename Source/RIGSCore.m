@@ -27,7 +27,7 @@
    History:
      - Original code from Avi Bryant's cupertino test project <avi@beta4.com>
      - Code patiently improved and augmented 
-         by Laurent Julliard <laurent.julliard@xrce.xerox.com>
+         by Laurent Julliard <laurent@julliard-online.org>
 
 */
 
@@ -50,6 +50,7 @@
 #include <Foundation/NSMapTable.h>
 #include <Foundation/NSSet.h>
 #include <Foundation/NSProcessInfo.h>
+#include <Foundation/NSBundle.h>
 #include <Foundation/NSDictionary.h>
 #include <Foundation/NSMethodSignature.h>
 #include <Foundation/NSString.h>
