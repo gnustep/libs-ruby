@@ -987,8 +987,7 @@ This is to mimic a  MACOSX function and have a single
 method_selectors_for_class  function for MACOSX and GNUstep
 (see below)
 */
-#ifdef GNUSTEP
-static MethodList_t class_nextMethodList( Class class, void ** iterator_ptr) 
+static MethodList_t class_getNextMethodList( Class class, void ** iterator_ptr )
 {
   MethodList_t mlist;
   
@@ -1003,8 +1002,6 @@ static MethodList_t class_nextMethodList( Class class, void ** iterator_ptr)
     
 }
 
-#endif
-
 NSArray* 
 method_selectors_for_class(Class class, BOOL use_super)
 {
@@ -1015,7 +1012,7 @@ method_selectors_for_class(Class class, BOOL use_super)
 
   while(class) {
 
-    while( (mlist = class_nextMethodList(class, &iterator)) != NULL) {
+    while( (mlist = class_getNextMethodList(class, &iterator)) != NULL) {
       
           for(i = 0; i < mlist->method_count; i++) {
               SEL sel = mlist->method_list[i].method_name;
