@@ -1,0 +1,36 @@
+INSTALLATION INSTRUCTIONS
+=========================
+
+To have the full functionality, you need to install a shared
+Objective-C runtime library; the libobjc provided with older gcc is
+static.  Please refer to the GNUstep website for more information on
+installing a shared libobjc.
+
+1) Make sure you have gnustep installed (optionally but strongly
+   recommended - with a shared libobjc - such as the gnustep-objc),
+   and that it is working.
+   
+2) Make sure your java environment is well configured.  
+   At least one of the following should be true: 
+  
+  * typing 'ruby' at the shell prompt should run the ruby interpreter
+  (ie, you have set up your PATH environment variable);
+
+
+
+3) Compile RIGS: 
+
+    make 
+
+4) Install RIGS: Become root, then type:
+
+    make install
+
+5) Play with RIGS.  The best place to start is the Examples
+   and Testing directory.
+
+I hope you'll have as much fun programming GNUstep from Ruby as I had when writing RIGS.
+
+Laurent Julliard
+
+

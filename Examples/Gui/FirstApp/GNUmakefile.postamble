@@ -1,0 +1,43 @@
+#   GNUmakefile.postmable: post makefile for GNUstep applications
+#    written in Ruby.
+#
+#   Copyright (C) 2001Free Software Foundation, Inc.
+#
+#   Author:  Laurent Julliard <laurent@julliard-online.org>
+#   Date: Sep 2001
+#   
+#   This file is part of GNUstep.
+#   
+#   This program is free software; you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation; either version 2 of the License, or
+#   (at your option) any later version.
+#   
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#   
+#   You should have received a copy of the GNU General Public License
+#   along with this program; if not, write to the Free Software
+#   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA. */
+
+
+ifeq ($(ADDITIONAL_RUBY_FILES),)
+
+after-all::
+#	@echo $(MAIN_RUBY_FILE) $(APP_NAME).$(APP_EXTENSION)/$(GNUSTEP_TARGET_LDIR)/`basename  $(MAIN_RUBY_FILE) .rb`
+	@cp $(MAIN_RUBY_FILE) $(APP_NAME).$(APP_EXTENSION)/$(GNUSTEP_TARGET_LDIR)/`basename  $(MAIN_RUBY_FILE) .rb`
+	@rm -rf $(GNUSTEP_OBJ_PREFIX) obj
+
+else
+
+after-all::
+	@cp $(MAIN_RUBY_FILE) $(APP_NAME).$(APP_EXTENSION)/$(GNUSTEP_TARGET_LDIR)/`basename  $(MAIN_RUBY_FILE) .rb`
+	@cp $(ADDITIONAL_RUBY_FILES) $(APP_DIR_NAME)/$(GNUSTEP_TARGET_LDIR)
+	@rm -rf $(GNUSTEP_OBJ_PREFIX) obj
+
+endif
+
+include $(GNUSTEP_MAKEFILES)/application.make
+

@@ -1,0 +1,57 @@
+#!/bin/sh
+#  run-test: Script to run all tests
+#
+#  Copyright (C) 2001 Free Software Foundation, Inc.
+#
+#  Author:  Laurent Julliard (inspired from Nicola Pero <n.pero@mi.flashnet.it>)
+#            
+#  Date: September2001
+#  
+#  This file is part of GNUstep.
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA. */
+
+
+# Script running all the tests and printing out final result at the end
+# This is not particularly meaningful as you really need to run most 
+# tests by hand and look at the output to make sure they make sense, 
+# but anyway it is a first check
+
+log_file=test.log
+
+tests_to_run=""
+
+failed=no
+
+rm -f $log_file
+
+for file in $tests_to_run; do 
+  echo "Running test $file...";
+  echo " " >> $log_file;
+  echo " === Test $file ===" >> $log_file;
+  echo " " >> $log_file;
+  if ! ruby -rrigs -I../Source/obj -I../Ruby $file >>$log_file 2>>$log_file; then
+    echo " * Test $file FAILED ! *";
+    failed=yes;
+  fi
+done
+
+echo " "
+
+if [ "$failed" = "yes" ]; then
+  echo "Some tests have FAILED";
+else
+  echo "All tests have PASSED";
+fi

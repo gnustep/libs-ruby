@@ -1,0 +1,38 @@
+
+This is not a comprehensive list. I'll add more items as I discover new "features" of GNUstep and Ruby:
+
+
+- Understand the ObjC/GNUstep memory management model and see if RIGS
+has it right. I think that I'm currently over conservative and don't
+free enough memory. This has to checked thoroughly.
+
+- See what to do with Protocols. See if they map to Ruby and how.
+
+- Morphing Ruby numbers into NSNumber (partially done)
+
+- Write more testing code
+
+- Implement _C_STRUCT_B conversion in both direction (argument and
+return value) and investigate how to best map STRUCT_B on Ruby types
+(class, Struct, Array ??). Problem is STRUCT_B (e.g NSPoint, NSRange,
+NSRect,...) are not ObjC classes so when returned to Ruby we don't
+know what type of STRUCT_B they are and we can not map them
+automatically on Ruby classes or structures....
+
+- Implement object duplication (dup). (Done!)
+
+- In NSArray add a new "new" Ruby method passing a Ruby array as
+argument and automatically initialize the ObjC NSArray with
+it. Conversely create a objects method in NSArray which return the
+objects in it into a Ruby array. (Done!)
+
+- Investigate how to map Ruby Hash on GNUstep dictionaries (like in
+NSArray above)
+
+- handle calls to ObjC methods with a variable number of arguments
+
+- revisit all NSxxx.h and declare enums and constant in Ruby NSxxx.rb
+files (a good example is NSString encoding constants. (see if this can
+be automated by parsing the NSxxx.h files (??)
+
+

@@ -1,0 +1,16 @@
+FirstApp is a sample GNUstep Application written in Ruby. It has been written to show how easy it is to write nice looking GNUstep application with RIGS.
+
+There is also a GNUmakefile (and GNUmakefile.postamble) showing how to
+use the GNUstep makefile system to make and install an application
+written in Ruby as if it was an ObjC application.
+
+Once you have installed this sample application with "make install"
+you can transparently open your GNUstep application written in Ruby as
+usual with:
+
+openapp FirstApp.app
+
+Enjoy! Feedback and contribution are welcome.
+
+Laurent Julliard
+laurent@julliard-online.org
