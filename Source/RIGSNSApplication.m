@@ -88,8 +88,7 @@ _RIGS_rebuild_argc_argv(VALUE rb_argc, VALUE rb_argv)
 VALUE _NSApplicationMainFromRuby(int arg_count, VALUE *arg_values, VALUE self) 
 {
 
-    id pool = [NSAutoreleasePool new];
-
+    CREATE_AUTORELEASE_POOL(pool);
   
     NSDebugLog(@"Arguments in NSProcessInfo before rebuild: %@",[[NSProcessInfo processInfo] arguments]);
 
@@ -118,7 +117,7 @@ VALUE _NSApplicationMainFromRuby(int arg_count, VALUE *arg_values, VALUE self)
     }
         
 
-    [pool release];
+    DESTROY(pool);
     
     return INT2FIX(NSApplicationMain(ourargc,(const char **)ourargv));
             
