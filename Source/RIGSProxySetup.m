@@ -178,8 +178,11 @@ Class _RIGS_register_ruby_class (VALUE rb_class)
 
         if (nbArgs < 0) {
           // skip over method with variable number of arguments
-          NSLog(@"**WARNING** Don't know how to handle method with variable number of args : %s",rb_mth_name);
-          continue;
+          //NSLog(@"**WARNING** Don't know how to handle method with variable number of args : %s",rb_mth_name);
+          //continue;
+	  // HACK: This is probably not the "Right Way" to fix the segfault 
+	  // bug, but it seems to work.
+	  nbArgs *= -1;
         }
         
         // Build the method ObjC types and then the full signature
