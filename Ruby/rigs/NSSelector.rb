@@ -24,6 +24,8 @@
 #    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111 USA.
 #
 
+require ('rigs/NSString')
+
 NSSelector = Rigs.class("NSSelector")
 
 module Rigs
