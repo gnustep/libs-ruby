@@ -1,3 +1,9 @@
+2004-10-07  Larry Coleman <larry@studio1620.com>
+
+	* Source/RIGSProxySetup.m: Set number of arguments for method 
+	being registered to absolute value if negative (skipping method 
+	was causing a segfault).
+
 2003-07-31  David Ayers  <d.ayers@inode.at>
 
 	* Source/RIGSCore.m: Remove reference to private header.
