@@ -1,3 +1,11 @@
+2005-02-21  Larry Coleman <larryliberty@yahoo.com>
+
+	* ChangeLog, NEWS, GNUmakefile, Source/GNUmakefile: Updated 
+	version number in preparation for release.
+
+	* TODO: updated action item regarding Ruby methods that accept
+	variable number of arguments.
+
 2004-10-07  Larry Coleman <larry@studio1620.com>
 
 	* Source/RIGSProxySetup.m: Set number of arguments for method 

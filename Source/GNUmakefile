@@ -28,7 +28,7 @@ include $(GNUSTEP_MAKEFILES)/common.make
 
 LIBRARY_NAME = librigs
 
-VERSION = 0.2.1
+VERSION = 0.2.2
 
 # Install librigs as a normal library in the system dir.
 # The postamble make file also installs it in the Ruby
