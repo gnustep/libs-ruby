@@ -56,7 +56,7 @@ BOOL ObjcUtilities_new_class (const char *name,
 			      const char *superclassName, 
 			      int ivarNumber, ...)
 {
-  objc_EXPORT void __objc_exec_class (Module_t module);
+  objc_EXPORT void __objc_exec_class (void *module);
   objc_EXPORT void __objc_resolve_class_links ();
   Module_t module;
   Symtab_t symtab;

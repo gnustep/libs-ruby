@@ -1,3 +1,8 @@
+2005-03-26  Larry Coleman <larryliberty@yahoo.com>
+
+	* Source/ObjcRuntimeUtilities.m: changed declaration of 
+	__objc_exec_class.
+
 2005-02-21  Larry Coleman <larryliberty@yahoo.com>
 
 	* ChangeLog, NEWS, GNUmakefile, Source/GNUmakefile: Updated 
