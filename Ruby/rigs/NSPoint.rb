@@ -24,24 +24,26 @@
 #    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111 USA.
 #
 
-class NSPoint
+require 'rigs/CStruct'
+
+class NSPoint < CStruct
 
     # Define a "fake" new method that simply returns 
-    # an array
+    # a CStruct (Not a NSPoint)
+    #def initialize(x,y)
     def NSPoint.new(x,y)
-	if ( !x.kind_of?(Numeric) )
-	    raise ArgumentError,"NSPoint 'x' is not a number", caller
-	end
-	if ( !y.kind_of?(Numeric) )
-	    raise ArgumentError,"NSPoint 'y' not an number", caller
-	end
-
-	[x,y]
+	newPoint = CStruct[x,y]
+	if (newPoint._validPoint?)
+	    return newPoint
+	else
+	    raise ArgumentError,"NSPoint 'x' or 'y' argument not valid", caller
+	end	
     end
 
 end
 
-class Array
+
+class CStruct
 
     def equalToPoint? (aPoint)
 	self == aPoint
@@ -64,6 +66,12 @@ class Array
     def pointInRect?(aRect)
 	self.mouseInRect?(aRect, true)
     end
+
+    def _validPoint?
+	( (self.kind_of? CStruct) && (self.array_size == 2) &&
+	(self[0].kind_of? Numeric) && (self[1].kind_of? Numeric) )
+    end
+
 end
 
 NSZeroPoint = NSPoint.new(0,0)
