@@ -28,7 +28,7 @@ class NSRect
 
     # Define a "fake" new method that simply returns 
     # an array
-    def NSRect.new(x,y,width,height)
+    def NSRect.new(x=0,y=0,width=0,height=0)
 	[NSPoint.new(x,y), NSSize.new(width,height)]
     end
 
