@@ -27,9 +27,19 @@
 #
 require 'rigs'
 
-Rigs.import("NSApplication")
-Rigs.import("NSMenu")
-Rigs.import("NSSelector")
+# You can drag all Foundation and AppKit Classes at once or ....
+require 'Foundation'
+require 'AppKit'
+
+#... get only those you need  one by one
+#Rigs.import("NSApplication")
+#Rigs.import("NSGraphicsContext")
+#Rigs.import("NSWindow")
+#Rigs.import("NSButton")
+#Rigs.import("NSProcessInfo")
+#Rigs.import("NSMenu")
+#Rigs.import("NSSelector")
+#Rigs.import("NSString")
 
 $STRING_AUTOCONVERT = true
 $SELECTOR_AUTOCONVERT = false
@@ -49,13 +59,16 @@ class MyDelegate
 #	"applicationWillFinishLaunching" => "v@:@", # return void
 #	"applicationShouldTerminate" => "C@:@"    # return a boolean
 #    }
+    def initialize 
+	@window = NSWindow.alloc
+    end
 
     def printHello(sender)
 	#print "Class of sender received by printHello: ",sender.type,"\n"
 	puts "Hello!"
     end
 
-    def applicationWillFinishLaunching (notification)
+    def createMenu
 	menu = NSMenu.new
 	infoMenu = NSMenu.new
 
@@ -79,6 +92,41 @@ class MyDelegate
 	           selector("terminate:"),"q")
 	
 	$NSApp.setMainMenu(menu)
+    end
+
+    def createWindow
+
+	styleMask = NSTitledWindowMask | NSClosableWindowMask |
+	    NSMiniaturizableWindowMask | NSResizableWindowMask
+
+	button = NSButton.new
+	button.setTarget(self)
+	button.setAction( selector("printHello:"))
+	button.setTitle("Print Hello!")
+	button.sizeToFit()
+
+	buttonSize = button.frame.rsize
+
+#	rect = NSRect.new(100, 100 , buttonSize.width, buttonSize.height)
+	rect = NSRect.new(0, 0, 400, 200)
+
+	@window = NSWindow.alloc
+	@window = @window.initWithContentRect_styleMask_backing_defer \
+	                 (rect, styleMask, NSBackingStoreRetained, false)
+
+	@window.setTitle("Test window with one giant button!")
+	@window.setContentView (button)
+
+    end
+
+    def applicationWillFinishLaunching (notification)
+	createMenu
+	createWindow
+    end
+
+    def applicationDidFinishLaunching (notification)
+	@window.center()
+	@window.makeKeyAndOrderFront(self)
     end
 
     def applicationShouldTerminate (notification)
