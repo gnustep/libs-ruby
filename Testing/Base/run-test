@@ -42,7 +42,7 @@ for file in $tests_to_run; do
   echo " " >> $log_file;
   echo " === Test $file ===" >> $log_file;
   echo " " >> $log_file;
-  if ! ruby -rrigs -I../Source/obj -I../Ruby $file >>$log_file 2>>$log_file; then
+  if ! ruby -rrigs -I../../Source/obj -I../../Ruby $file >>$log_file 2>>$log_file; then
     echo " * Test $file FAILED ! *";
     failed=yes;
   fi

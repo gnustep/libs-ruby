@@ -1,3 +1,9 @@
+2005-04-16  Larry Coleman <larryliberty@yahoo.com>
+
+	* Testing/Base/run-test, Testing/Gui/run-test: Updated include paths
+	in ruby invocations (make check wasn't working unless installed 
+	first).
+
 2005-03-26  Larry Coleman <larryliberty@yahoo.com>
 
 	* Source/ObjcRuntimeUtilities.m: changed declaration of 
