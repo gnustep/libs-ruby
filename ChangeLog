@@ -1,3 +1,9 @@
+2006-09-08  Nicola Pero  <nicola.pero@meta-innovation.com>
+
+	* Source/GNUmakefile.postamble (after-install): Updating by
+	removing special case for debug=yes; newer gnustep-make does not
+	add '_d' to libraries built with debugging enabled.
+
 2005-04-16  Larry Coleman <larryliberty@yahoo.com>
 
 	* Testing/Base/run-test, Testing/Gui/run-test: Updated include paths
