@@ -28,6 +28,9 @@
 #   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111 USA.
 #
 
+# FIXME - someone who has Ruby setup and can test this should remove
+# the check for librigs_d.so.  The library will always be called
+# librigs.so in newer gnustep-make releases. :-)
 
 # If loading librigs.so and librigs_d.so (debug version)
 # then say tchao bambino....
