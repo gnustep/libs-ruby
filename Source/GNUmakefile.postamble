@@ -39,19 +39,9 @@
 #before-install::
 
 # Things to do after installing
-# install the librigs.so in Ruby dir. Name it librigs.so even if it is
-# a debug version (omit the _d suffix)
-ifeq ($(debug),)
-
+# install the librigs.so in Ruby dir.
 after-install::
 	@cp -f $(GNUSTEP_OBJ_DIR)/$(LIBRARY_NAME).so $(RUBY_SITE_ARCH_DIR)
-
-else
-
-after-install::
-	@cp -f $(GNUSTEP_OBJ_DIR)/$(LIBRARY_NAME)_d.so $(RUBY_SITE_ARCH_DIR)/$(LIBRARY_NAME).so
-
-endif
 
 # Things to do before uninstalling
 #before-uninstall::
