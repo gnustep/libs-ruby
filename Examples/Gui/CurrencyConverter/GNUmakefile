@@ -25,8 +25,6 @@
 
 include $(GNUSTEP_MAKEFILES)/common.make
 
-GNUSTEP_INSTALLATION_DIR = $(GNUSTEP_USER_ROOT)
-
 APP_NAME = CurrencyConverter
 
 #FIXME? Can we avoid that? This is just to give gcc something
