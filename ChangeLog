@@ -1,3 +1,10 @@
+2006-10-09  Nicola Pero  <nicola.pero@meta-innovation.com>
+
+	* GNUmakefile: Do not set GNUSTEP_INSTALLATION_DIR.
+	* Source/GNUmakefile: Same change.
+	* Examples/Gui/FirstApp/GNUmakefile: Same change.
+	* Examples/Gui/CurrencyConverter/GNUmakefile: Same change.
+	
 2006-09-08  Nicola Pero  <nicola.pero@meta-innovation.com>
 
 	* Source/GNUmakefile.postamble (after-install): Updating by

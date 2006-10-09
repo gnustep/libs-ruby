@@ -30,12 +30,6 @@ LIBRARY_NAME = librigs
 
 VERSION = 0.2.2
 
-# Install librigs as a normal library in the system dir.
-# The postamble make file also installs it in the Ruby
-# site directory 
-#
-GNUSTEP_INSTALLATION_DIR = $(GNUSTEP_LOCAL_ROOT)
-
 # Dynamically determine where the things must be installed
 # in Ruby
 RUBY_ARCH_DIR := $(shell ruby -rrbconfig -e 'print Config::CONFIG["archdir"]')

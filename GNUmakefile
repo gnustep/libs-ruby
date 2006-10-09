@@ -28,7 +28,6 @@ PACKAGE_NAME = rigs
 # Keep it in sync manually with Source/GNUmakefile
 VERSION = 0.2.2
 
-GNUSTEP_INSTALLATION_DIR=$(GNUSTEP_LOCAL_ROOT)
 RPM_DISABLE_RELOCATABLE=YES
 
 SUBPROJECTS = Source Ruby Testing
