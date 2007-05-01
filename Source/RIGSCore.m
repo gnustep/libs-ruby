@@ -1332,28 +1332,16 @@ void _rb_objc_initialize_process_context(VALUE rb_argc, VALUE rb_argv)
 {
     NSProcessInfo *pi = nil;
     NSString *topProgram;
-    BOOL properProcessInitDone = NO;
     CREATE_AUTORELEASE_POOL(pool);		
         
     
     // rebuild our own argc and argv from what Ruby gives us
     _rb_objc_rebuild_argc_argv(rb_argc, rb_argv);
 
-    // Now see if process info has already been properly initialized
-    // NSInternalInconsistencyException raised if not
-    NS_DURING
-
-      pi = [NSProcessInfo processInfo];
-    
-    NS_HANDLER
-
-      [NSProcessInfo initializeWithArguments:ourargv
-                                        count:ourargc
-                                  environment:environ];
-       pi = [NSProcessInfo processInfo];
-       properProcessInitDone = YES;
-    
-    NS_ENDHANDLER
+    [NSProcessInfo initializeWithArguments:ourargv
+				      count:ourargc
+				environment:environ];
+     pi = [NSProcessInfo processInfo];
 
     // Process Info still null ? It shouldn't...
     if (pi == nil) {
@@ -1376,25 +1364,6 @@ void _rb_objc_initialize_process_context(VALUE rb_argc, VALUE rb_argv)
       
     }
     
-    // At this point we do have a properly initialize processInfo structure
-    // so now patch the mainBundle to reflect the real location of the Ruby
-    // tool/Application
-    if (!properProcessInitDone) {
-             
-      extern void _gnu_process_args(int argc, char *argv[], char *env[]);
-
-      /* Patch GNUstep Processinfo structure to take into account the 
-              the debug flag given on the command line (--GNU-Debug=dflt)
-              We cannot use NSProcessInfo initializeWithArguments: because it
-              was called at the very beginning by the NSProcessInfo +load method
-              and calling it a second time has no effect (See NSApplication.m)
-              FIXME?? : the only work around I have found is to call the internal
-              function _gnu_process_args again */
-
-      _gnu_process_args(ourargc,ourargv,environ);
- 
-    }
-
     // In any case patch the main Bundle
     _rb_objc_rebuild_main_bundle();
 

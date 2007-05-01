@@ -33,6 +33,7 @@
 // it is also defined in Foundation/NSBundle.h
 #include "ruby.h"
 #undef _
+#undef __
 
 char **ourargv;
 int ourargc;

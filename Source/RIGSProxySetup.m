@@ -42,6 +42,7 @@
 
 #include "ruby.h"
 #undef _ 
+#undef __ 
 /* must undefine because it conflicts with a macro with 
    the same name included by Foundation.h in ObjcRuntimeUtilities.h */
 #include "ObjcRuntimeUtilities.h"
