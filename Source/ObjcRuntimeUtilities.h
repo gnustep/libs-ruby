@@ -23,11 +23,10 @@
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111 USA.
    */
 
-#ifndef __ObjcRuntimeUtilities_h_GNUSTEP_JAVA_INCLUDE
-#define __ObjcRuntimeUtilities_h_GNUSTEP_JAVA_INCLUDE
+#ifndef __ObjcRuntimeUtilities_h_GNUSTEP_RUBY_INCLUDE
+#define __ObjcRuntimeUtilities_h_GNUSTEP_RUBY_INCLUDE
 
 #include <objc/objc-api.h>
-#include <objc/thr.h>
 #include <objc/encoding.h>
 #include <Foundation/Foundation.h>
 
@@ -169,4 +168,4 @@ const char *ObjcUtilities_build_runtime_Objc_signature (const char *);
 
 void ObjcUtilities_register_method_list (Class class, MethodList *ml);
 
-#endif /* __ObjcRuntimeUtilitis_h_GNUSTEP_JAVA_INCLUDE */
+#endif /* __ObjcRuntimeUtilitis_h_GNUSTEP_RUBY_INCLUDE */

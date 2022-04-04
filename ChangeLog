@@ -1,3 +1,9 @@
+2022-04-04 Gregory John Casamento <greg.casamento@gmail.com>
+
+	* Ruby/GNUmakefile
+	* Source/GNUmakefile: Use RbConfig instead of Config.
+	* Source/ObjcRuntimeUtilities.h: Try to fix includes.
+
 2006-10-09  Nicola Pero  <nicola.pero@meta-innovation.com>
 
 	* GNUmakefile: Do not set GNUSTEP_INSTALLATION_DIR.

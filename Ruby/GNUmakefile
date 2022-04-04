@@ -28,7 +28,7 @@ include $(GNUSTEP_MAKEFILES)/common.make
 
 # Dynamically determine where the things must be installed
 # in Ruby
-RUBY_SITE_LIB_DIR := $(shell ruby -rrbconfig -e 'print Config::CONFIG["sitelibdir"]')
+RUBY_SITE_LIB_DIR := $(shell ruby -rrbconfig -e 'print RbConfig::CONFIG["sitelibdir"]')
 
 
 after-install::

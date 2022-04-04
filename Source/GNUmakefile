@@ -32,9 +32,9 @@ VERSION = 0.2.2
 
 # Dynamically determine where the things must be installed
 # in Ruby
-RUBY_ARCH_DIR := $(shell ruby -rrbconfig -e 'print Config::CONFIG["archdir"]')
+RUBY_ARCH_DIR := $(shell ruby -rrbconfig -e 'print RbConfig::CONFIG["archdir"]')
 
-RUBY_SITE_ARCH_DIR := $(shell ruby -rrbconfig -e 'print Config::CONFIG["sitearchdir"]')
+RUBY_SITE_ARCH_DIR := $(shell ruby -rrbconfig -e 'print RbConfig::CONFIG["sitearchdir"]')
 
 ADDITIONAL_INCLUDE_DIRS = -I$(RUBY_ARCH_DIR)
 ADDITIONAL_OBJCFLAGS = -Wall -g -DVERSION=\"$(VERSION)\"
