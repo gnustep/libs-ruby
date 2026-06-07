@@ -119,6 +119,12 @@ static VALUE numberAutoConvert = Qfalse;
 #define IS_NUMBER_AUTOCONVERT_ON() \
 (numberAutoConvert == Qtrue)
 
+static const char *
+RIGSObjCSkipTypeQualifiers(const char *type)
+{
+    return objc_skip_type_qualifiers(type);
+}
+
 
 /* Define a couple of macros to get/set Ruby CStruct objects 
     (CStruct class is the Ruby equivalent of the C structure */
@@ -201,9 +207,11 @@ rb_objc_convert_to_objc(VALUE rb_thing,void *data, int offset, const char *type)
     BOOL ret = YES;
     Class objcClass;
     NSString *msg;
+    const char *originalType = type;
     VALUE rb_class_val;
     int idx = 0;
     BOOL inStruct = NO;
+    type = RIGSObjCSkipTypeQualifiers(type);
   
  
     // If Ruby gave the NIL value then bypass all the rest
@@ -225,16 +233,17 @@ rb_objc_convert_to_objc(VALUE rb_thing,void *data, int offset, const char *type)
 
     do {
         
-        int	align = objc_alignof_type(type); /* pad to alignment */
+        const char *componentType = RIGSObjCSkipTypeQualifiers(type);
+        int	align = objc_alignof_type(componentType); /* pad to alignment */
         void	*where;
         VALUE	rb_val;
    
         offset = ROUND(offset, align);
         where = data + offset;
-        offset += objc_sizeof_type(type);
+        offset += objc_sizeof_type(componentType);
 
        NSDebugLog(@"Converting Ruby value (0x%lx, type 0x%02lx) to ObjC value of type '%c' at target address 0x%lx)",
-                   rb_thing, TYPE(rb_thing),*type,where);
+                   rb_thing, TYPE(rb_thing),*componentType,where);
 
         if (inStruct) {
             rb_val = RB_CSTRUCT_ENTRY(rb_thing,idx);
@@ -244,7 +253,7 @@ rb_objc_convert_to_objc(VALUE rb_thing,void *data, int offset, const char *type)
         }
 
         // All other cases
-        switch (*type) {
+        switch (*componentType) {
       
         case _C_ID:
         case _C_CLASS:
@@ -467,7 +476,7 @@ rb_objc_convert_to_objc(VALUE rb_thing,void *data, int offset, const char *type)
             
                 s = STR2CSTR(rb_val);
                 l = strlen(s)+1;
-                d = [NSMutableData dataWithBytesNoCopy: s length: l];
+                d = [NSMutableData dataWithBytes: s length: l];
                 *(char**)where = (char*)[d mutableBytes];
             
             } else if (TYPE(rb_val) == T_DATA) {
@@ -490,7 +499,7 @@ rb_objc_convert_to_objc(VALUE rb_thing,void *data, int offset, const char *type)
             
                 s = STR2CSTR(rb_val);
                 l = strlen(s);
-                d = [NSMutableData dataWithBytesNoCopy: s length: l];
+                d = [NSMutableData dataWithBytes: s length: l];
                 *(void**)where = (void*)[d mutableBytes];
             
             } else if (TYPE(rb_val) == T_DATA) {
@@ -510,7 +519,7 @@ rb_objc_convert_to_objc(VALUE rb_thing,void *data, int offset, const char *type)
             // The Ruby argument must be of type CStruct or a sub-class of it
             if (rb_obj_is_kind_of(rb_val, RB_CSTRUCT_CLASS) == Qtrue) {
               
-                if ( rb_objc_convert_to_objc(rb_val, where, 0, type) == NO) {     
+                if ( rb_objc_convert_to_objc(rb_val, where, 0, componentType) == NO) {
                     // if something went wrong in the conversion just return Qnil
                     rb_val = Qnil;
                     ret = NO;
@@ -530,13 +539,13 @@ rb_objc_convert_to_objc(VALUE rb_thing,void *data, int offset, const char *type)
         }
 
         // skip the component we have just processed
-        type = objc_skip_typespec(type);
+        type = objc_skip_typespec(componentType);
 
     } while (inStruct && *type != _C_STRUCT_E);
   
     if (ret == NO) {
         /* raise exception - Don't know how to handle this type of argument */
-        msg = [NSString stringWithFormat: @"Don't know how to convert Ruby type 0x%02x in ObjC type '%c'", TYPE(rb_thing), *type];
+        msg = [NSString stringWithFormat: @"Don't know how to convert Ruby type 0x%02x in ObjC type '%s'", TYPE(rb_thing), originalType];
         NSDebugLog(msg);
         rb_raise(rb_eTypeError, [msg cString]);
     }
@@ -555,6 +564,7 @@ rb_objc_convert_to_rb(void *data, int offset, const char *type, VALUE *rb_val_pt
     NSSelector *selObj;
     BOOL inStruct = NO;
     VALUE end = Qnil;
+    type = RIGSObjCSkipTypeQualifiers(type);
 
 
     if (*type == _C_STRUCT_B) {
@@ -575,17 +585,18 @@ rb_objc_convert_to_rb(void *data, int offset, const char *type, VALUE *rb_val_pt
   do {
 
       VALUE    rb_val;
-      int	align = objc_alignof_type (type); /* pad to alignment */
+      const char *componentType = RIGSObjCSkipTypeQualifiers(type);
+      int	align = objc_alignof_type (componentType); /* pad to alignment */
       void	*where;
 
       NSDebugLog(@"Converting ObjC value (0x%lx) of type '%c' to Ruby value",
-                 *(id*)data, *type);
+                 *(id*)data, *componentType);
 
       offset = ROUND(offset, align);
       where = data + offset;
-      offset += objc_sizeof_type(type);
+      offset += objc_sizeof_type(componentType);
 
-      switch (*type)
+      switch (*componentType)
           {
           case _C_ID: {
               id val = *(id*)where;
@@ -780,7 +791,7 @@ rb_objc_convert_to_rb(void *data, int offset, const char *type, VALUE *rb_val_pt
               // We are attacking a new embedded structure in a structure
             
           
-            if ( rb_objc_convert_to_rb(where, 0, type, &rb_val) == NO) {     
+            if ( rb_objc_convert_to_rb(where, 0, componentType, &rb_val) == NO) {
                 // if something went wrong in the conversion just return Qnil
                 rb_val = Qnil;
                 ret = NO;
@@ -790,7 +801,7 @@ rb_objc_convert_to_rb(void *data, int offset, const char *type, VALUE *rb_val_pt
             break; 
 
         default:
-            NSLog(@"Don't know how to convert ObjC type '%c' to Ruby VALUE",*type);
+            NSLog(@"Don't know how to convert ObjC type '%s' to Ruby VALUE", componentType);
             rb_val = Qnil;
             ret = NO;
             
@@ -821,7 +832,7 @@ rb_objc_convert_to_rb(void *data, int offset, const char *type, VALUE *rb_val_pt
       }
      
       // skip the type of the component we have just processed
-      type = (char*)objc_skip_typespec(type);
+      type = (char*)objc_skip_typespec(componentType);
 
  
  
@@ -1429,7 +1440,7 @@ Init_librigs()
     // Define the NSNotFound enum constant that is used all over the place
     // as a return value by Objective C methods
     rb_define_global_const("NSNotFound", LL2NUM((long long)NSNotFound));
-    
+
     // Initialize Process Info and Main Bundle
     rb_argv = rb_gv_get("$*");
     rb_argc = INT2FIX(RARRAY_LEN(rb_argv));

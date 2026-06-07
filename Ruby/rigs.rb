@@ -47,6 +47,26 @@ rescue LoadError
 
 end
 
+%w[
+    NSCharacterConversionException
+    NSDestinationInvalidException
+    NSGenericException
+    NSInternalInconsistencyException
+    NSInvalidArgumentException
+    NSInvalidReceivePortException
+    NSInvalidSendPortException
+    NSMallocException
+    NSObjectInaccessibleException
+    NSObjectNotAvailableException
+    NSOldStyleException
+    NSPortReceiveException
+    NSPortSendException
+    NSPortTimeoutException
+    NSRangeException
+].each do |exception_name|
+    Object.const_set(exception_name, Class.new(RuntimeError)) unless Object.const_defined?(exception_name)
+end
+
 
 
 
