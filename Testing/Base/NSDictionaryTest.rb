@@ -82,14 +82,14 @@ class NSDictionaryTest
 	puts "Now testing removeObjectForKey ()"
 	dictionaryOne = NSMutableDictionary.new
     
-	dictionaryOne.setObject_forKey ("value1", "key1")
-	if (!dictionaryOne.objectForKey ("key1").isEqual("value1"))
+	dictionaryOne.setObject_forKey("value1", "key1")
+	if (!dictionaryOne.objectForKey("key1").isEqual("value1"))
 	    puts "setObject_forKey didn't work"
 	    puts "==> test failed"
 	    exit 1
 	end
-	dictionaryOne.removeObjectForKey ("key1")
-	if (dictionaryOne.objectForKey ("key1") != nil)
+	dictionaryOne.removeObjectForKey("key1")
+	if (dictionaryOne.objectForKey("key1") != nil)
 	    puts "removeObjectForKey didn't work"
 	    puts "==> test failed"
 	    exit 1
@@ -108,7 +108,7 @@ class NSDictionaryTest
 	GC.start
 
 	dictionaryOne.removeObjectForKey("key1")
-	if (dictionaryOne.objectForKey ("key1") != nil)
+	if (dictionaryOne.objectForKey("key1") != nil)
 	    puts "removeObjectForKey didn't work"
 	    puts "==> test failed"
 	    exit 1

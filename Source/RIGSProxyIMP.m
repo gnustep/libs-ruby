@@ -25,8 +25,10 @@
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111 USA.
    */ 
 
-#include <objc/objc-api.h>
-#include <objc/thr.h>
+#include <stddef.h>
+#include <objc/runtime.h>
+#include <objc/encoding.h>
+#include <string.h>
 
 #include "RIGS.h"
 #include "RIGSCore.h"
@@ -36,11 +38,124 @@
 #include "RIGSWrapObject.h"
 #include "RIGSSelectorMapping.h"
 
+static void
+_RIGS_copy_objc_argument_from_varargs(va_list *ap, const char *type, void *dest)
+{
+  switch (*type)
+    {
+    case _C_ID:
+      {
+	id value = va_arg(*ap, id);
+	memcpy(dest, &value, sizeof(value));
+      }
+      break;
+    case _C_CLASS:
+      {
+	Class value = va_arg(*ap, Class);
+	memcpy(dest, &value, sizeof(value));
+      }
+      break;
+    case _C_SEL:
+      {
+	SEL value = va_arg(*ap, SEL);
+	memcpy(dest, &value, sizeof(value));
+      }
+      break;
+    case _C_CHR:
+      {
+	char value = (char)va_arg(*ap, int);
+	memcpy(dest, &value, sizeof(value));
+      }
+      break;
+    case _C_UCHR:
+      {
+	unsigned char value = (unsigned char)va_arg(*ap, int);
+	memcpy(dest, &value, sizeof(value));
+      }
+      break;
+    case _C_SHT:
+      {
+	short value = (short)va_arg(*ap, int);
+	memcpy(dest, &value, sizeof(value));
+      }
+      break;
+    case _C_USHT:
+      {
+	unsigned short value = (unsigned short)va_arg(*ap, int);
+	memcpy(dest, &value, sizeof(value));
+      }
+      break;
+    case _C_INT:
+      {
+	int value = va_arg(*ap, int);
+	memcpy(dest, &value, sizeof(value));
+      }
+      break;
+    case _C_UINT:
+      {
+	unsigned int value = va_arg(*ap, unsigned int);
+	memcpy(dest, &value, sizeof(value));
+      }
+      break;
+    case _C_LNG:
+      {
+	long value = va_arg(*ap, long);
+	memcpy(dest, &value, sizeof(value));
+      }
+      break;
+    case _C_ULNG:
+      {
+	unsigned long value = va_arg(*ap, unsigned long);
+	memcpy(dest, &value, sizeof(value));
+      }
+      break;
+    case _C_LNG_LNG:
+      {
+	long long value = va_arg(*ap, long long);
+	memcpy(dest, &value, sizeof(value));
+      }
+      break;
+    case _C_ULNG_LNG:
+      {
+	unsigned long long value = va_arg(*ap, unsigned long long);
+	memcpy(dest, &value, sizeof(value));
+      }
+      break;
+    case _C_FLT:
+      {
+	float value = (float)va_arg(*ap, double);
+	memcpy(dest, &value, sizeof(value));
+      }
+      break;
+    case _C_DBL:
+      {
+	double value = va_arg(*ap, double);
+	memcpy(dest, &value, sizeof(value));
+      }
+      break;
+    case _C_CHARPTR:
+      {
+	char *value = va_arg(*ap, char *);
+	memcpy(dest, &value, sizeof(value));
+      }
+      break;
+    case _C_PTR:
+      {
+	void *value = va_arg(*ap, void *);
+	memcpy(dest, &value, sizeof(value));
+      }
+      break;
+    default:
+      memset(dest, 0, objc_sizeof_type(type));
+      break;
+    }
+}
+
 
 #define COMMON_VAR_DECLARATION \
   const char *type; \
   const char *return_type; \
-  Class class = (Class)(rcv->class_pointer); \
+  Class class = object_getClass(rcv); \
   const char *className; \
   const char *rb_mth_name; \
   int i; \
@@ -110,10 +225,10 @@
       while (*type != '\0') {                           \
           int size = objc_sizeof_type(type); \
 	      { \
-		struct dummy {  char val[size]; } block; \
+		void *block = alloca(size); \
                 int offset = 0; \
-                block = va_arg(ap, struct dummy); \
-	        okydoky = rb_objc_convert_to_rb((void *) &block, offset, type, &rb_args[i]); \
+                _RIGS_copy_objc_argument_from_varargs(&ap, type, block); \
+	        okydoky = rb_objc_convert_to_rb(block, offset, type, &rb_args[i]); \
               } \
           type = objc_skip_argspec (type); \
 	  i++; }                               

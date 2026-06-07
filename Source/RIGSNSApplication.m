@@ -37,16 +37,16 @@
 // Ruvy view of the NSApp global GNUstep variable
 static VALUE rb_NSApp = Qnil;
 
-VALUE _RIGS_get_NSApp(ID rb_id, VALUE *data, global_entry_ptr entry) 
+VALUE _RIGS_get_NSApp(ID rb_id, VALUE *data) 
 {
   DATA_PTR(rb_NSApp) = NSApp;
   return rb_NSApp;
 }
 
-void _RIGS_set_NSApp(VALUE value, ID rb_id, VALUE *data, global_entry_ptr entry) 
+void _RIGS_set_NSApp(VALUE value, ID rb_id, VALUE *data) 
 {
   
-  Data_Get_Struct(value, NSApplication, NSApp);
+  NSApp = (NSApplication *)DATA_PTR(value);
   DATA_PTR(rb_NSApp) = NSApp;
   NSDebugLog(@"Setting NSApp to 0x%lx", NSApp);
   

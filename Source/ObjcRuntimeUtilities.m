@@ -39,189 +39,90 @@
  *	Objective-C runtime you are using.  You can find this in the file
  *	'init.c' in the GNU objective-C runtime source.
  */
-#define	OBJC_VERSION	8
-
-#include "ObjcRuntimeUtilities.h"
+#import "ObjcRuntimeUtilities.h"
+#import <objc/runtime.h>
 #include <string.h>
 
-#ifndef objc_EXPORT
-#if libobjc_ISDLL /* linking against DLL version of libobjc */
-#  define objc_EXPORT  extern __declspec(dllimport)
-#else 
-#  define objc_EXPORT  extern
-#endif
-#endif
-
-BOOL ObjcUtilities_new_class (const char *name, 
-			      const char *superclassName, 
-			      int ivarNumber, ...)
+BOOL ObjcUtilities_new_class(const char *name, 
+			     const char *superclassName, 
+			     int ivarNumber, ...)
 {
-  objc_EXPORT void __objc_exec_class (void *module);
-  objc_EXPORT void __objc_resolve_class_links ();
-  Module_t module;
-  Symtab_t symtab;
-  Class super_class;
-  Class new_class;
-  int ivarsize;
   
-  //
-  // Check that the name for the new class isn't already in use.
-  //
-  if (objc_lookup_class (name) != nil) 
+  NSValue *classPointer = nil;
+  NSArray *classes = nil;
+  NSMutableDictionary *ivarDictionary = [NSMutableDictionary dictionary];
+  NSString *className = [NSString stringWithUTF8String: name];
+  NSString *superClassName = [NSString stringWithUTF8String: superclassName];
+
+  if (objc_getClass (name) != Nil || objc_getClass (superclassName) == Nil)
     {
       return NO;
     }
-
-  //
-  // Check that the superclass exists.
-  //
-  super_class = objc_lookup_class (superclassName);
-  if (super_class == nil)
-    {
-      return NO;
-    }
-
-  //
-  // Prepare a fake module containing only this class.
-  //
-  module = objc_calloc (1, sizeof (Module));
-  module->version = OBJC_VERSION;
-  module->size = sizeof (Module);
-  module->name = objc_malloc (strlen (name) + 15);
-  strcpy ((char*)module->name, "GNUstep-Proxy-");
-  strcat ((char*)module->name, name);
-  module->symtab = objc_calloc (1, sizeof (Symtab));
   
-  symtab = module->symtab;
-  symtab->sel_ref_cnt = 0;
-  symtab->refs = 0;
-  symtab->cls_def_cnt = 1; // We are defining a single class.
-  symtab->cat_def_cnt = 0; // But no categories 
-  // Allocate space for two classes (the class and its meta class)
-  symtab->defs[0] = objc_calloc (2, sizeof (struct objc_class));
-  symtab->defs[1] = 0;    // NULL terminate the list.
-  
-  //
-  //	Build class structure.
-  //
-
-  // Class
-  new_class = (Class)symtab->defs[0];
-
-  // NB: There is a trick here. 
-  // The runtime system will look up the name in the following string,
-  // and replace it with a pointer to the actual superclass structure.
-  // This also means the type of pointer will change, that's why we 
-  // need to force it with a (void *)
-  new_class->super_class = (void *)superclassName;
-
-  new_class->name = objc_malloc (strlen (name) + 1);
-  strcpy ((char*)new_class->name, name);
-  new_class->version = 0;
-  new_class->info = _CLS_CLASS;
-  ivarsize = super_class->instance_size;
-
+  // Build ivar dictionary....
   if (ivarNumber > 0)
     {
-      // Prepare ivars
       va_list  ap;
-      struct objc_ivar *ivar;
-      int size, i;
-
-      size = sizeof (struct objc_ivar_list);
-      size += (ivarNumber - 1) * sizeof (struct objc_ivar);
-
-      new_class->ivars = (struct objc_ivar_list*) objc_malloc (size);
-      new_class->ivars->ivar_count = ivarNumber;
+      int i = 0;
       
-      va_start (ap, ivarNumber);
-      
-      ivar = new_class->ivars->ivar_list;
-      
+      // Prepare ivars
+      va_start(ap, ivarNumber);      
       for (i = 0; i < ivarNumber; i++)
 	{
-	  char *name = strdup (va_arg (ap, char *));
-	  char *type = strdup (va_arg (ap, char *));
-	  
-	  int	align;
-	  
-	  ivar->ivar_name = name;
-	  ivar->ivar_type = type;
-      
-	  align = objc_alignof_type (ivar->ivar_type); // pad to alignment
-	  ivarsize = align * ((ivarsize + align - 1) /align); // ROUND
-	  ivar->ivar_offset = ivarsize;
-	  ivarsize += objc_sizeof_type (ivar->ivar_type);
-	  ivar++;
+	  const char *ivarNameCString = va_arg (ap, char *);
+	  const char *ivarTypeCString = va_arg (ap, char *);
+	  NSString *ivarName = [NSString stringWithUTF8String: ivarNameCString];
+	  NSString *ivarType = [NSString stringWithUTF8String: ivarTypeCString];
+
+	  [ivarDictionary setObject: ivarType
+			     forKey: ivarName];
 	}
-      va_end (ap);
+      va_end(ap);
+    }
+
+  classPointer = GSObjCMakeClass(className,
+				 superClassName,
+				 ivarDictionary);
+
+  if (classPointer == nil)
+    {
+      return NO;
+    }
+
+  classes = [NSArray arrayWithObject: classPointer];
+  GSObjCAddClasses(classes);
+
+  return (objc_getClass (name) != Nil);
+}
+
+BOOL ObjcUtilities_add_method(Class class,
+			      const char *name,
+			      const char *types,
+			      IMP imp)
+{
+  SEL selector;
+  
+  selector = GSSelectorFromNameAndTypes(name, types);
+  if (selector == NULL)
+    {
+      selector = sel_registerName(name);
     }
   
-  new_class->instance_size = ivarsize;
-  
-  // Meta class
-  new_class->class_pointer = &new_class[1];
-  new_class->class_pointer->super_class = (void *)superclassName;
-  new_class->class_pointer->name = new_class->name;
-  new_class->class_pointer->version = 0;
-  new_class->class_pointer->info = _CLS_META;
-  new_class->class_pointer->instance_size 
-    = super_class->class_pointer->instance_size;
-
-  // Insert our new class into the runtime.
-  __objc_exec_class (module);
-  __objc_resolve_class_links();
-
-  return YES;
+  return class_addMethod(class, selector, imp, types);
 }
 
-MethodList *ObjcUtilities_alloc_method_list (int count)
-{
-  MethodList *ml;
-  int extra;
-
-  extra = (sizeof (struct objc_method)) * (count - 1);
-  ml = objc_calloc (1, sizeof(MethodList) + extra);
-  ml->method_count = count;  
-  return ml;
-}
-
-void ObjcUtilities_insert_method_in_list (MethodList *ml, 
-					  int index, const char *name, 
-					  const char *types, IMP imp)
-{
-  Method *method;
-
-  method = &(ml->method_list[index]);
-  method->method_name = (void *)strdup (name);
-  method->method_types = strdup (types);
-  method->method_imp = imp;
-}
-
-const char *ObjcUtilities_build_runtime_Objc_signature (const char 
-							       *types)
+const char *ObjcUtilities_build_runtime_Objc_signature(const char *types)
 {
   NSMethodSignature *sig;
   
   sig = [NSMethodSignature signatureWithObjCTypes: types];
-  
-#if defined GNUSTEP_BASE_VERSION || defined(LIB_FOUNDATION_LIBRARY)
-  return [sig methodType];
-#else
-# error "Don't know how to get method signature on this platform!"
-#endif  
-}
+  if (sig == nil)
+    {
+      return NULL;
+    }
 
-void ObjcUtilities_register_method_list (Class class, MethodList *ml)
-{
-  objc_EXPORT void class_add_method_list (Class class, MethodList_t list);
-  objc_EXPORT objc_mutex_t __objc_runtime_mutex;
-  
-  objc_mutex_lock (__objc_runtime_mutex);
-  class_add_method_list (class, ml);
-  objc_mutex_unlock (__objc_runtime_mutex);
+  return types;
 }
-
 
 
 

@@ -32,6 +32,8 @@
 */
 
 #ifdef GNUSTEP
+#include <stddef.h>
+#include <objc/runtime.h>
 #include <objc/encoding.h>
 #endif
 

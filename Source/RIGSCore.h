@@ -32,11 +32,21 @@
 // After inclusion of ruby.h undefine the "_" macro because 
 // it is also defined in Foundation/NSBundle.h
 #include "ruby.h"
+#ifndef STR2CSTR
+static inline char *RIGSStringValueCStr(VALUE value)
+{
+  return (char *)StringValueCStr(value);
+}
+#define STR2CSTR(value) RIGSStringValueCStr(value)
+#endif
+#ifdef rb_argv
+#undef rb_argv
+#endif
 #undef _
 #undef __
 
-char **ourargv;
-int ourargc;
+extern char **ourargv;
+extern int ourargc;
 
 void  rb_objc_release(id objc_object);
 void  rb_objc_mark(VALUE rb_object);

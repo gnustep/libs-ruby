@@ -36,7 +36,11 @@ RUBY_ARCH_DIR := $(shell ruby -rrbconfig -e 'print RbConfig::CONFIG["archdir"]')
 
 RUBY_SITE_ARCH_DIR := $(shell ruby -rrbconfig -e 'print RbConfig::CONFIG["sitearchdir"]')
 
-ADDITIONAL_INCLUDE_DIRS = -I$(RUBY_ARCH_DIR)
+RUBY_HDR_DIR := $(shell ruby -rrbconfig -e 'print RbConfig::CONFIG["rubyhdrdir"]')
+
+RUBY_ARCH_HDR_DIR := $(shell ruby -rrbconfig -e 'print RbConfig::CONFIG["rubyarchhdrdir"]')
+
+ADDITIONAL_INCLUDE_DIRS = -I$(RUBY_HDR_DIR) -I$(RUBY_ARCH_HDR_DIR) -I$(RUBY_ARCH_DIR)
 ADDITIONAL_OBJCFLAGS = -Wall -g -DVERSION=\"$(VERSION)\"
 
 $(LIBRARY_NAME)_OBJC_FILES = $(wildcard *.m)

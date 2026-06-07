@@ -26,9 +26,8 @@
 #ifndef __ObjcRuntimeUtilities_h_GNUSTEP_RUBY_INCLUDE
 #define __ObjcRuntimeUtilities_h_GNUSTEP_RUBY_INCLUDE
 
-#include <objc/objc-api.h>
-#include <objc/encoding.h>
-#include <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
+#import <GNUstepBase/GSObjCRuntime.h>
 
 /* 
  * This code is by no means tidied to Java.  
@@ -85,50 +84,29 @@ BOOL ObjcUtilities_new_class (const char *name, const char *superclassName,
 
   Adding new methods to a class
 
-  Quick HOWTO: 
-  A. alloc a MethodList using ObjcUtilities_alloc_method_list.
-  B. insert the methods you want to register in the MethodList using 
-     ObjcUtilities_insert_method_in_list.
-     To get the objective-C runtime type for a method, you may want to use 
-     ObjcUtilities_build_runtime_Objc_signature
-  C. register your method list with the objective-C runtime using 
-     ObjcUtilities_register_method_list.
+  To get the Objective-C runtime type for a method, you may want to use 
+  ObjcUtilities_build_runtime_Objc_signature before adding the method with
+  ObjcUtilities_add_method.
   */
 
 /*
- * ObjcUtilities_alloc_method_list:
+ * ObjcUtilities_add_method:
  *
- * Allocate a MethodList capable of containing `count' methods. 
- * A pointer to the allocated list is returned. 
+ * Add a method definition to a class.  `class' is the class to modify,
+ * `name' is the selector name, `types' is the Objective-C run-time
+ * signature of the method, and `imp' is the implementation.
  *
  */
 
-MethodList *ObjcUtilities_alloc_method_list (int count);
-
-/*
- * ObjcUtilities_insert_method_in_list:
- *
- * Insert a method definition in a MethodList.  `ml' is a pointer to
- * the MethodList.  `index' is the index of the method to add.  `name'
- * is the name of the method; `types' is the objective-C run-time
- * signature of the method (see below for a facility to create this
- * automatically), `imp' is the IMP (ie, the actual implementation of
- * the method).  `imp' must be a pointer to a function taking the
- * correct arguments and returning the correct type; cast it to an IMP 
- * then before calling this function.
- */
-
-void ObjcUtilities_insert_method_in_list (MethodList *ml, 
-					  int index, const char *name, 
-					  const char *types, IMP imp);
+BOOL ObjcUtilities_add_method (Class class, const char *name, 
+			       const char *types, IMP imp);
 
 /*
  * ObjcUtilities_build_runtime_Objc_signature:
  *
  * This method creates a runtime objc signature which can be used 
  * to describe type for a selector *on this machine* (you need this 
- * signature for example to insert a method description in a method list,
- * using the ObjcUtilities_insert_method_in_list function above).
+ * signature for example to add a method to a class.
  *
  * It takes as argument a 'naive' objc signature, in the form of 
  * a string obtained by concatenating the following strings: 
@@ -148,24 +126,10 @@ void ObjcUtilities_insert_method_in_list (MethodList *ml,
  *
  * On my machine, ObjcUtilities_build_runtime_Objc_signature ("i@:@")
  * returns "i12@0:4@8", which I can then use as selector type when 
- * creating entries in MethodList.
+ * adding a method to a class.
  *
  */
 
 const char *ObjcUtilities_build_runtime_Objc_signature (const char *);
-
-/*
- * ObjcUtilities_register_method_list:
- *
- * Add the list `ml' of methods to an existing Class `class'.
- * They are registered as instance methods. 
- * To add class methods, you simply need to pass the meta class 
- * [(Class)class->class_pointer] instead of the class.
- *
- * *Never* release or modify a method list after registering it with
- * *the objective-C runtime.  
- */
-
-void ObjcUtilities_register_method_list (Class class, MethodList *ml);
 
 #endif /* __ObjcRuntimeUtilitis_h_GNUSTEP_RUBY_INCLUDE */

@@ -65,7 +65,7 @@
     return nil;
     
   // Loop through the elements of the ruby array and generate a NSArray
-  count = RARRAY(ruby_array)->len;
+  count = RARRAY_LEN(ruby_array);
   gnustepObjects = malloc (sizeof (id) * count);
   if (gnustepObjects == NULL) {
       return nil;

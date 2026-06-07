@@ -86,7 +86,6 @@ int _RIGS_ruby_method_arity(const char *rb_class_name, const char *rb_mth_name)
 Class _RIGS_register_ruby_class (VALUE rb_class)
 {
   CREATE_AUTORELEASE_POOL(pool);
-  MethodList *ml;
   int i;
   int count;
   VALUE listOption;
@@ -117,7 +116,7 @@ Class _RIGS_register_ruby_class (VALUE rb_class)
       return nil;
   }
 
-  NSDebugLog (@"Registering Ruby class %s with the objective-C runtime", 
+  NSDebugLog (@"Registering Ruby class %s with the Objective-C runtime", 
               rb_class_name);
 
   // If this class has already been registered with ObjC then
@@ -157,120 +156,119 @@ Class _RIGS_register_ruby_class (VALUE rb_class)
   listOption = INT2FIX(0);
   rb_mth_ary = rb_class_instance_methods(0,&listOption,rb_class);
   // number of instance methods in this class
-  count = RARRAY(rb_mth_ary)->len;
+  count = RARRAY_LEN(rb_mth_ary);
   NSDebugLog(@"This Ruby class has %d instance methods",count);
 
   // Prepare the instance methods list
   if (count > 0) {
-
-      ml = ObjcUtilities_alloc_method_list (count);
+    for (i=0;i<count;i++) {
       
-      for (i=0;i<count;i++) {
-
-        // get the Ruby method arity (number of arguments)
-        rb_mth_name = STR2CSTR(rb_ary_entry(rb_mth_ary, (long)i));
-        
-        nbArgs = _RIGS_ruby_method_arity(rb_class_name, rb_mth_name);
+      // get the Ruby method arity (number of arguments)
+      rb_mth_name = STR2CSTR(rb_ary_entry(rb_mth_ary, (long)i));
       
- 
-        objcMthName = SelectorStringFromRubyName(rb_mth_name, nbArgs);
-
-        NSDebugLog(@"Ruby method %s has %d arguments",rb_mth_name,nbArgs);
-
-        if (nbArgs < 0) {
-          // skip over method with variable number of arguments
-          //NSLog(@"**WARNING** Don't know how to handle method with variable number of args : %s",rb_mth_name);
-          //continue;
-	  // HACK: This is probably not the "Right Way" to fix the segfault 
-	  // bug, but it seems to work.
-	  nbArgs *= -1;
-        }
-        
-        // Build the method ObjC types and then the full signature
-        guessed = _RIGS_build_objc_types(rb_class, rb_mth_name, '\0', nbArgs, objcTypes);
-        signature = ObjcUtilities_build_runtime_Objc_signature(objcTypes); 
-        
-        NSDebugLog(@"Inserting ObjC method %@ with signature '%s'",objcMthName,signature);
-
-
-        switch (*objcTypes)
-          {
-          case _C_ID:
-            mthIMP = (IMP) _RIGS_id_IMP_RubyMethod;
-            break;
-          case _C_SEL:
-            mthIMP = (IMP) _RIGS_SEL_IMP_RubyMethod;
-            break;
-          case _C_CLASS:
-            mthIMP = (IMP) _RIGS_id_IMP_RubyMethod;
-            break;
-          case _C_VOID:
-            mthIMP = (IMP) _RIGS_void_IMP_RubyMethod;
-            break;
-          case _C_CHARPTR:
-            mthIMP = (IMP) _RIGS_char_ptr_IMP_RubyMethod;
-            break;
-           case _C_CHR:
-            mthIMP = (IMP) _RIGS_char_IMP_RubyMethod;
-            break;
-          case _C_UCHR:
-            mthIMP = (IMP) _RIGS_unsigned_char_IMP_RubyMethod;
-            break;
-          case _C_SHT:
-            mthIMP = (IMP) _RIGS_short_IMP_RubyMethod;
-            break;
-          case _C_USHT:
-            mthIMP = (IMP) _RIGS_unsigned_short_IMP_RubyMethod;
-            break;
-          case _C_INT:
-            mthIMP = (IMP) _RIGS_int_IMP_RubyMethod;
-            break;
-          case _C_UINT:
-            mthIMP = (IMP) _RIGS_unsigned_int_IMP_RubyMethod;
-            break;
-          case _C_LNG:
-            mthIMP = (IMP) _RIGS_long_IMP_RubyMethod;
-            break;
-          case _C_ULNG:
-            mthIMP = (IMP) _RIGS_unsigned_long_IMP_RubyMethod;
-            break;
-          case _C_FLT:
-            mthIMP = (IMP) _RIGS_float_IMP_RubyMethod;
-            break;
-          case _C_DBL:
-            mthIMP = (IMP) _RIGS_double_IMP_RubyMethod;
-            break;
-          default:
-              mthIMP = (IMP) NULL;
-            break;
-            
-          }
-        
-        if (mthIMP == (IMP)NULL)
-            {
-                NSString *reason = 
-                    [NSString stringWithFormat:@"Unrecognized return type '%c' to IMP for ruby method %s",objcTypes[0],rb_mth_name];
-                
-                [NSException raise: @"Ruby Interface Error" format:reason];
-            }
-        
-        ObjcUtilities_insert_method_in_list(ml, i, [objcMthName cString],
-                                            signature,mthIMP);
-
-      } /*end for method loop */
+      nbArgs = _RIGS_ruby_method_arity(rb_class_name, rb_mth_name);
       
       
-      NSDebugLog(@"REALLY Registering %d instance methods", count);
-
-      // Register the instance method list with the Objective C runtime
-      ObjcUtilities_register_method_list (class, ml);
+      objcMthName = SelectorStringFromRubyName(rb_mth_name, nbArgs);
+      
+      NSDebugLog(@"Ruby method %s has %d arguments",rb_mth_name,nbArgs);
+      
+      if (nbArgs < 0) {
+	// skip over method with variable number of arguments
+	//NSLog(@"**WARNING** Don't know how to handle method with variable number of args : %s",rb_mth_name);
+	//continue;
+	// HACK: This is probably not the "Right Way" to fix the segfault 
+	// bug, but it seems to work.
+	nbArgs *= -1;
+      }
+      
+      // Build the method ObjC types and then the full signature
+      guessed = _RIGS_build_objc_types(rb_class, rb_mth_name, '\0', nbArgs, objcTypes);
+      signature = ObjcUtilities_build_runtime_Objc_signature(objcTypes); 
+      
+      NSDebugLog(@"Inserting ObjC method %@ with signature '%s'",objcMthName,signature);
+      
+      
+      switch (*objcTypes)
+	{
+	case _C_ID:
+	  mthIMP = (IMP) _RIGS_id_IMP_RubyMethod;
+	  break;
+	case _C_SEL:
+	  mthIMP = (IMP) _RIGS_SEL_IMP_RubyMethod;
+	  break;
+	case _C_CLASS:
+	  mthIMP = (IMP) _RIGS_id_IMP_RubyMethod;
+	  break;
+	case _C_VOID:
+	  mthIMP = (IMP) _RIGS_void_IMP_RubyMethod;
+	  break;
+	case _C_CHARPTR:
+	  mthIMP = (IMP) _RIGS_char_ptr_IMP_RubyMethod;
+	  break;
+	case _C_CHR:
+	  mthIMP = (IMP) _RIGS_char_IMP_RubyMethod;
+	  break;
+	case _C_UCHR:
+	  mthIMP = (IMP) _RIGS_unsigned_char_IMP_RubyMethod;
+	  break;
+	case _C_SHT:
+	  mthIMP = (IMP) _RIGS_short_IMP_RubyMethod;
+	  break;
+	case _C_USHT:
+	  mthIMP = (IMP) _RIGS_unsigned_short_IMP_RubyMethod;
+	  break;
+	case _C_INT:
+	  mthIMP = (IMP) _RIGS_int_IMP_RubyMethod;
+	  break;
+	case _C_UINT:
+	  mthIMP = (IMP) _RIGS_unsigned_int_IMP_RubyMethod;
+	  break;
+	case _C_LNG:
+	case _C_LNG_LNG:
+	  mthIMP = (IMP) _RIGS_long_IMP_RubyMethod;
+	  break;
+	case _C_ULNG:
+	case _C_ULNG_LNG:
+	  mthIMP = (IMP) _RIGS_unsigned_long_IMP_RubyMethod;
+	  break;
+	case _C_FLT:
+	  mthIMP = (IMP) _RIGS_float_IMP_RubyMethod;
+	  break;
+	case _C_DBL:
+	  mthIMP = (IMP) _RIGS_double_IMP_RubyMethod;
+	  break;
+	default:
+	  mthIMP = (IMP) NULL;
+	  break;
+          
+	}
+      
+      if (mthIMP == (IMP)NULL)
+	{
+	  NSString *reason = 
+	    [NSString stringWithFormat:@"Unrecognized return type '%c' to IMP for ruby method %s",objcTypes[0],rb_mth_name];
+	  
+	  [NSException raise: @"Ruby Interface Error" format:reason];
+	}
+      
+      if (ObjcUtilities_add_method(class, [objcMthName cString],
+				   signature, mthIMP) == NO)
+	{
+	  NSDebugLog(@"Could not add ObjC method %@ with signature '%s'",
+		     objcMthName, signature);
+	}
+      
+    } /*end for method loop */
+    
+    
+    NSDebugLog(@"REALLY Registering %d instance methods", count);
   }
   
 
   DESTROY(pool);
-
-  return class;
   
+  return class;
 }
 
 

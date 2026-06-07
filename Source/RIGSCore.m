@@ -37,7 +37,10 @@
 
 
 #ifdef GNUSTEP
+#include <stddef.h>
+#include <objc/runtime.h>
 #include <objc/encoding.h>
+#include <stdlib.h>
 
 #define ROUND(V, A) \
   ({ typeof(V) __v=(V); typeof(A) __a=(A); \
@@ -176,7 +179,7 @@ rb_objc_new(int rb_argc, VALUE *rb_argv, VALUE rb_class)
     VALUE new_rb_object;
    
     // get the class from the objc_class class variable now
-    Class objc_class = (Class) NUM2UINT(rb_iv_get(rb_class, "@objc_class"));
+    Class objc_class = (Class) NUM2ULONG(rb_iv_get(rb_class, "@objc_class"));
 
     // This object is not released on purpose. The Ruby garbage collector
     // will take care of deallocating it by calling rb_objc_release()
@@ -249,7 +252,7 @@ rb_objc_convert_to_objc(VALUE rb_thing,void *data, int offset, const char *type)
             switch (TYPE(rb_val))
                 {
                 case T_DATA:
-                    Data_Get_Struct(rb_val,id,* (id*)where);
+                    *(id*)where = (id)DATA_PTR(rb_val);
           
                     /* Automatic conversion from string -- see below _C_SEL case
                        if ([ret class] == [NSSelector class]) {
@@ -328,7 +331,7 @@ rb_objc_convert_to_objc(VALUE rb_thing,void *data, int offset, const char *type)
                 // This is in case the selector is passed as an instance of NSSelector
                 // which is a class the we have created
                 id object;
-                Data_Get_Struct(rb_val,id,object);
+                object = (id)DATA_PTR(rb_val);
                 if ([object isKindOfClass: [NSSelector class]]) {
                     *(SEL*)where = [object getSEL];
                 } else {
@@ -400,14 +403,28 @@ rb_objc_convert_to_objc(VALUE rb_thing,void *data, int offset, const char *type)
 
         case _C_LNG:
             if (TYPE(rb_val) == T_FIXNUM || TYPE(rb_val) == T_BIGNUM )
-                *(long*)where = (long) NUM2INT(rb_val);
+                *(long*)where = NUM2LONG(rb_val);
             else
                 ret = NO;	  	
             break;
 
         case _C_ULNG:
             if (TYPE(rb_val) == T_FIXNUM || TYPE(rb_val) == T_BIGNUM )
-                *(unsigned long*)where = (unsigned long) NUM2INT(rb_val);
+                *(unsigned long*)where = NUM2ULONG(rb_val);
+            else
+                ret = NO;	  	
+            break;
+
+        case _C_LNG_LNG:
+            if (TYPE(rb_val) == T_FIXNUM || TYPE(rb_val) == T_BIGNUM )
+                *(long long*)where = NUM2LL(rb_val);
+            else
+                ret = NO;	  	
+            break;
+
+        case _C_ULNG_LNG:
+            if (TYPE(rb_val) == T_FIXNUM || TYPE(rb_val) == T_BIGNUM )
+                *(unsigned long long*)where = NUM2ULL(rb_val);
             else
                 ret = NO;	  	
             break;
@@ -456,7 +473,7 @@ rb_objc_convert_to_objc(VALUE rb_thing,void *data, int offset, const char *type)
             } else if (TYPE(rb_val) == T_DATA) {
                 // I guess this is the right thing to do. Pass the
                 // embedded ObjC as a blob
-                Data_Get_Struct(rb_val,char* ,* (char**)where);
+                *(char**)where = (char*)DATA_PTR(rb_val);
             } else {
                 ret = NO;
             }
@@ -601,11 +618,11 @@ rb_objc_convert_to_rb(void *data, int offset, const char *type, VALUE *rb_val_pt
                   // to its type
                   const char *tmptype = [val objCType];
                   int tmpsize = objc_sizeof_type(tmptype);
-                  struct dummy {  char val[tmpsize]; } block;
+                  void *block = alloca(tmpsize);
 
-                  [val getValue: (void *)&block];
+                  [val getValue: block];
               
-                  rb_objc_convert_to_rb(&block, 0, tmptype, &rb_val);
+                  rb_objc_convert_to_rb(block, 0, tmptype, &rb_val);
                   
               } else {
                   
@@ -684,7 +701,15 @@ rb_objc_convert_to_rb(void *data, int offset, const char *type, VALUE *rb_val_pt
             break;
 
         case _C_ULNG:
-            rb_val = INT2FIX(*(unsigned long*)where);
+            rb_val = ULONG2NUM(*(unsigned long*)where);
+            break;
+
+        case _C_LNG_LNG:
+            rb_val = LL2NUM(*(long long*)where);
+            break;
+
+        case _C_ULNG_LNG:
+            rb_val = ULL2NUM(*(unsigned long long*)where);
             break;
 
         case _C_FLT:
@@ -845,13 +870,13 @@ rb_objc_send_with_selector(SEL sel, int rb_argc, VALUE *rb_argv, VALUE rb_self)
     case T_DATA:
         NSDebugLog(@"Self Ruby value is 0x%lx (ObjC is at 0x%lx)",rb_self,DATA_PTR(rb_self));
         
-        Data_Get_Struct(rb_self,id,rcv);
+        rcv = (id)DATA_PTR(rb_self);
         
         NSDebugLog(@"Self is an object of Class %@ (description is '%@')",NSStringFromClass([rcv class]),rcv);
       break;
 
     case T_CLASS:
-        rcv = (id) NUM2UINT(rb_iv_get(rb_self, "@objc_class"));
+        rcv = (id) NUM2ULONG(rb_iv_get(rb_self, "@objc_class"));
         NSDebugLog(@"Self is Class: %@", NSStringFromClass(rcv));
       break;
 
@@ -945,7 +970,7 @@ rb_objc_send_with_selector(SEL sel, int rb_argc, VALUE *rb_argv, VALUE rb_self)
 VALUE 
 rb_objc_handler(int rb_argc, VALUE *rb_argv, VALUE rb_self)
 {    
-	return rb_objc_send(rb_id2name(rb_frame_last_func()), rb_argc, rb_argv, rb_self);
+	return rb_objc_send((char *)rb_id2name(rb_frame_this_func()), rb_argc, rb_argv, rb_self);
 }
 
 VALUE 
@@ -956,7 +981,7 @@ rb_objc_to_s_handler(VALUE rb_self)
     VALUE rb_desc;
 
     // Invoke ObjC description method and always return a Ruby string
-    Data_Get_Struct(rb_self,id,rcv);
+    rcv = (id)DATA_PTR(rb_self);
     rb_desc = rb_str_new2([[rcv description] cString]);
  
     DESTROY(pool);
@@ -967,7 +992,7 @@ rb_objc_to_s_handler(VALUE rb_self)
 VALUE
 rb_objc_invoke(int rb_argc, VALUE *rb_argv, VALUE rb_self)
 {
-	char *method = rb_id2name(SYM2ID(rb_argv[0]));
+	char *method = (char *)rb_id2name(SYM2ID(rb_argv[0]));
  
 	return rb_objc_send(method, rb_argc-1, rb_argv+1, rb_self);
 }
@@ -975,7 +1000,7 @@ rb_objc_invoke(int rb_argc, VALUE *rb_argv, VALUE rb_self)
 NSArray* 
 class_method_selectors_for_class(Class class, BOOL use_super)
 {    
-  Class meta_class =  class_get_meta_class(class);
+  Class meta_class = object_getClass((id)class);
   return(method_selectors_for_class(meta_class, use_super));
 }
 
@@ -985,47 +1010,26 @@ instance_method_selectors_for_class(Class class, BOOL use_super)
   return(method_selectors_for_class(class, use_super));
 }
 
-/*
-This is to mimic a  MACOSX function and have a single
-method_selectors_for_class  function for MACOSX and GNUstep
-(see below)
-*/
-static MethodList_t class_getNextMethodList( Class class, void ** iterator_ptr )
-{
-  MethodList_t mlist;
-  
-  if (*iterator_ptr) {
-    mlist = ((MethodList_t) (*iterator_ptr) )->method_next;
-  } else {
-    mlist = class->methods;
-  }
-
-  *iterator_ptr = (void *)mlist;
-  return mlist;
-    
-}
-
 NSArray* 
 method_selectors_for_class(Class class, BOOL use_super)
 {
-  MethodList_t mlist;     
   NSMutableSet *methodSet = [NSMutableSet new];
-  int i;
-  void *iterator = NULL;
+  unsigned int i;
 
   while(class) {
+    Method *methods;
+    unsigned int methodCount;
 
-    while( (mlist = class_getNextMethodList(class, &iterator)) != NULL) {
-      
-          for(i = 0; i < mlist->method_count; i++) {
-              SEL sel = mlist->method_list[i].method_name;
-              [methodSet addObject: NSStringFromSelector(sel)];
-              //NSLog(@"method name %@",NSStringFromSelector(sel));
-          }
+    methods = class_copyMethodList(class, &methodCount);
+    for(i = 0; i < methodCount; i++) {
+      SEL sel = method_getName(methods[i]);
+      [methodSet addObject: NSStringFromSelector(sel)];
+      //NSLog(@"method name %@",NSStringFromSelector(sel));
     }
+    free(methods);
                 
     if(use_super)
-      class = class->super_class;
+      class = class_getSuperclass(class);
     else
       class = NULL;
   }
@@ -1042,7 +1046,7 @@ int rb_objc_register_instance_methods(Class objc_class, VALUE rb_class)
     int imth_cnt = 0;
 
     //Store the ObjcC Class id in the @@objc_class Ruby Class Variable
-    rb_iv_set(rb_class, "@objc_class", INT2NUM((int)objc_class));
+    rb_iv_set(rb_class, "@objc_class", ULONG2NUM((unsigned long)objc_class));
     
     /* Define all Ruby Instance methods for this Class */
     allMthSels = method_selectors_for_class(objc_class, NO);
@@ -1071,7 +1075,7 @@ int rb_objc_register_class_methods(Class objc_class, VALUE rb_class)
     NSEnumerator *mthEnum;
     NSString *mthSel;
     NSString *mthRubyName;
-    Class objc_meta_class = class_get_meta_class(objc_class);
+    Class objc_meta_class = object_getClass((id)objc_class);
     
     int cmth_cnt = 0;
 
@@ -1424,11 +1428,11 @@ Init_librigs()
 
     // Define the NSNotFound enum constant that is used all over the place
     // as a return value by Objective C methods
-    rb_define_global_const("NSNotFound", INT2FIX((int)NSNotFound));
+    rb_define_global_const("NSNotFound", LL2NUM((long long)NSNotFound));
     
     // Initialize Process Info and Main Bundle
     rb_argv = rb_gv_get("$*");
-    rb_argc = INT2FIX(RARRAY(rb_argv)->len);
+    rb_argc = INT2FIX(RARRAY_LEN(rb_argv));
 
     _rb_objc_initialize_process_context(rb_argc, rb_argv);
 

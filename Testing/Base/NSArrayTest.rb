@@ -204,7 +204,7 @@ class NSArrayTest
 	puts "Now trying to clone () #{arrayOne}"
 	arrayTwo = arrayOne.dup
 	puts "Comparing the original array and its clone"
-	compare (arrayOne, arrayTwo, true)
+	compare(arrayOne, arrayTwo, true)
 	puts
 
 	# OK, then write it to a file and read it back. */
@@ -262,4 +262,3 @@ class NSArrayTest
 end 
     
 NSArrayTest.main
-
