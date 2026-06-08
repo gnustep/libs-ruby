@@ -29,17 +29,17 @@ require 'rigs'
 
 # You can drag all Foundation and AppKit Classes at once or ....
 require 'Foundation'
-require 'AppKit'
+# require 'AppKit'
 
 #... get only those you need  one by one
-#Rigs.import("NSApplication")
-#Rigs.import("NSGraphicsContext")
-#Rigs.import("NSWindow")
-#Rigs.import("NSButton")
-#Rigs.import("NSProcessInfo")
-#Rigs.import("NSMenu")
-#Rigs.import("NSSelector")
-#Rigs.import("NSString")
+Rigs.import("NSApplication")
+Rigs.import("NSGraphicsContext")
+Rigs.import("NSWindow")
+Rigs.import("NSButton")
+Rigs.import("NSProcessInfo")
+Rigs.import("NSMenu")
+Rigs.import("NSSelector")
+Rigs.import("NSString")
 
 $STRING_AUTOCONVERT = true
 $SELECTOR_AUTOCONVERT = false
@@ -111,8 +111,8 @@ class MyDelegate
 	rect = NSRect.new(0, 0, 400, 200)
 
 	@window = NSWindow.alloc
-	@window = @window.initWithContentRect_styleMask_backing_defer \
-	                 (rect, styleMask, NSBackingStoreRetained, false)
+	@window = @window.initWithContentRect_styleMask_backing_defer(
+	                 rect, styleMask, NSBackingStoreRetained, false)
 
 	@window.setTitle("Test window with one giant button!")
 	@window.setContentView (button)

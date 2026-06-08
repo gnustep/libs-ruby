@@ -162,9 +162,14 @@ Class _RIGS_register_ruby_class (VALUE rb_class)
   // Prepare the instance methods list
   if (count > 0) {
     for (i=0;i<count;i++) {
+      VALUE rb_mth_entry;
       
       // get the Ruby method arity (number of arguments)
-      rb_mth_name = STR2CSTR(rb_ary_entry(rb_mth_ary, (long)i));
+      rb_mth_entry = rb_ary_entry(rb_mth_ary, (long)i);
+      if (TYPE(rb_mth_entry) == T_SYMBOL) {
+        rb_mth_entry = rb_sym_to_s(rb_mth_entry);
+      }
+      rb_mth_name = STR2CSTR(rb_mth_entry);
       
       nbArgs = _RIGS_ruby_method_arity(rb_class_name, rb_mth_name);
       

@@ -40,8 +40,8 @@ class NSWindowTest
 	styleMask = NSTitledWindowMask | NSClosableWindowMask |
 	    NSMiniaturizableWindowMask | NSResizableWindowMask
 
-	@window.initWithContentRect_styleMask_backing_defer \
-	                 (rect, styleMask, NSBackingStoreRetained, false)
+	@window.initWithContentRect_styleMask_backing_defer(
+	                 rect, styleMask, NSBackingStoreRetained, false)
 	@window.setTitle("GNUstep GUI working from Ruby")
     end
   
