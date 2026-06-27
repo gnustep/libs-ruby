@@ -42,7 +42,21 @@
 
 require 'rigs'
 require 'Foundation'
-require 'AppKit'
+
+Rigs.import("NSApplication")
+
+# AppKit imports such as NSFont need a shared NSApplication before they can
+# initialize GNUstep backend state.
+app = NSApplication.sharedApplication
+
+Rigs.import("GSHbox")
+Rigs.import("GSVbox")
+Rigs.import("NSColor")
+Rigs.import("NSMenu")
+Rigs.import("NSProcessInfo")
+Rigs.import("NSSelector")
+Rigs.import("NSTextField")
+Rigs.import("NSWindow")
 
 $STRING_AUTOCONVERT = true
 
@@ -253,10 +267,6 @@ end
 
 # Main. Execution starts from here.
 
-# Get the object representing our application.
-# the $NSApp global variable also contains the app object
-app = NSApplication.sharedApplication
-
 # Create and initializes an instance of our custom object.
 converter = CurrencyConverter.new
    
@@ -269,6 +279,6 @@ converter = CurrencyConverter.new
 app.setDelegate(converter)
 
 # Finally, all is ready to run our application.
-NSApplicationMain()
+$NSApp.run
 
 exit

@@ -145,11 +145,9 @@ end
 # after a call to sharedApplication
 NSApplication.sharedApplication
 
-$NSApp.setDelegate(MyDelegate.new)
+delegate = MyDelegate.new
+$NSApp.setDelegate(delegate)
 
-# Calling NSApplicationMain is better because it puts all the 
-# Process and Bundle information in place
-#$NSApp.run
-NSApplicationMain()
+$NSApp.run
 
 exit
